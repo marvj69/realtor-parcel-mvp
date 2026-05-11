@@ -13,9 +13,12 @@
 - [x] Confirm demo parcel bbox and click lookup work.
 - [x] Confirm selected parcel highlight and details drawer work.
 - [x] Confirm save parcel API can be triggered in demo mode.
-- [ ] Replace placeholder `.env.local` `DATABASE_URL` with a real Neon PostGIS connection string.
-- [ ] Run `npm run db:schema` against Neon/PostGIS.
-- [ ] Run `npm run db:seed` against Neon/PostGIS.
+- [x] Replace placeholder `.env.local` `DATABASE_URL` with a real Neon PostGIS connection string.
+- [x] Run `npm run db:schema` against Neon/PostGIS.
+- [x] Run `npm run db:seed` against Neon/PostGIS.
+- [x] Confirm `/api/health` reports real PostGIS mode, not demo fallback mode.
+- [x] Deploy production app to Vercel.
+- [x] Verify live map, parcel click lookup, and save API workflow.
 
 ## Parcel map MVP
 
@@ -26,20 +29,21 @@
 - [x] Show parcel ID/APN, owner, address, acreage, county/source, and import/source timestamps when available.
 - [x] Trigger save selected parcel to a project through `/api/saved-parcels`.
 - [x] Trigger private parcel note submission through `/api/saved-parcels`.
-- [ ] Persist saved parcels and notes after Neon schema is applied.
+- [x] Persist saved parcels and notes after Neon schema is applied.
 - [ ] Add search by APN/site address/owner.
 - [ ] Add project sidebar.
 
 ## Data ingestion
 
-- [ ] Create `config/county-sources.local.json` from example.
-- [ ] Identify first county GIS parcel source.
-- [ ] Verify public usage/disclaimer terms.
-- [ ] Fetch ArcGIS FeatureServer layer or download parcel GeoJSON.
-- [ ] Normalize source field mappings.
-- [ ] Import into PostGIS.
-- [ ] Record source URL and import date.
-- [ ] Validate parcels on the map.
+- [x] Create ignored `config/county-sources.local.json` from example.
+- [x] Identify first county GIS parcel source: Houghton County / Colligo GIS `Houghton_MI_Parcels_2024` FeatureServer.
+- [x] Verify public source metadata and county data-sharing restrictions.
+- [x] Fetch a small 25-feature ArcGIS FeatureServer sample, not the full county dataset.
+- [x] Normalize source field mappings for the Houghton sample.
+- [x] Import the small sample into Neon/PostGIS.
+- [x] Record source URL and import date in `parcel_sources`.
+- [x] Validate imported sample via `/api/parcels/bbox`, `/api/parcels/search`, and `/api/parcels/lookup`.
+- [ ] Confirm written permission/terms before bulk-importing or redistributing full Houghton County parcel data.
 
 ## Realtor-specific features
 
@@ -58,23 +62,32 @@
 - [ ] Add rate limiting.
 - [ ] Add import-job logging.
 - [ ] Add monitoring/error logging.
-- [ ] Add deployment checklist.
+- [x] Add deployment environment variable documentation.
 - [ ] Add data-source refresh schedule.
 
-## First-pass blockers
+## Live deployment status
 
-- [ ] Real Neon/PostGIS `DATABASE_URL` is not configured yet. Database scripts now fail fast with a clear message instead of trying the placeholder URL.
-- [ ] Docker is installed locally, but the Docker daemon was not running during verification, so a local PostGIS container could not be started.
-- [ ] This folder is not currently initialized as a Git repository, so changes could not be committed from this pass.
-- [ ] No real county parcel source has been validated or imported yet; the app is using clearly labeled demo parcel data only.
+- Production URL: `https://realtor-parcel-mvp.vercel.app`
+- Deployment ID: `dpl_9KiySGqHNwXZ7KhoZ5bHMgUZqXFj`
+- GitHub repo: `https://github.com/marvj69/realtor-parcel-mvp`
+- Latest pushed commits: `b4c0726` and follow-up status/doc commit.
+- Neon/PostGIS is working in local and production API routes.
+- Demo fallback remains available when `DATABASE_URL` is missing or still a placeholder.
+
+## Current blockers
+
+- [ ] Houghton County data sharing agreement restricts selling, redistributing, or sublicensing digital data without written consent; treat the 25-feature sample as internal MVP validation only until terms are confirmed.
+- [ ] No authentication or per-user data ownership yet, so production use should stay private/internal.
+- [ ] Search API exists, but the search box is not yet exposed in the UI.
+- [ ] Project/sidebar workflow is still minimal; saved parcels persist through the API but are not listed in the UI yet.
 
 ## Next recommended tasks
 
-- [ ] Create/link the Neon database, enable PostGIS, set `DATABASE_URL`, then run `npm run db:schema` and `npm run db:seed`.
-- [ ] Pick the first realtor market county and validate its public GIS parcel layer terms/disclaimers.
-- [ ] Create `config/county-sources.local.json` with field mappings and import a small real parcel sample.
 - [ ] Add a visible APN/address/owner search box connected to `/api/parcels/search`.
 - [ ] Add a saved-project sidebar that lists saved parcels and notes from Postgres.
+- [ ] Add authentication and per-user project ownership before inviting multiple real users.
+- [ ] Add a printable/exportable parcel brief for selected parcels.
+- [ ] Request/confirm permission for broader Houghton County parcel data use before importing the full dataset.
 
 ## Later
 
