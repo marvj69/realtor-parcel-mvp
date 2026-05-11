@@ -112,79 +112,31 @@ textarea {
   background-color: transparent;
 }
 
-.map-status {
+.map-basemap-button {
   position: absolute;
-  z-index: 1;
-  left: 12px;
-  top: 12px;
-  max-width: 420px;
-  padding: 10px 12px;
+  z-index: 2;
+  top: 86px;
+  right: 12px;
+  min-width: 76px;
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
-  background: var(--glass-dark);
-  color: white;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+  padding: 7px 10px;
+  background: var(--glass-panel-strong);
+  color: #0f172a;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  font-size: 13px;
-}
-
-.map-status strong {
-  display: block;
-  margin-bottom: 4px;
-}
-
-.map-status p {
-  margin: 0;
-  color: #dbeafe;
-}
-
-.session-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 12px;
-}
-
-.map-status .text-button {
-  color: #bfdbfe;
-}
-
-.map-basemap-toggle {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3px;
-  width: fit-content;
-  margin-top: 10px;
-  padding: 3px;
-  border: 1px solid rgba(191, 219, 254, 0.28);
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.26);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-}
-
-.map-basemap-toggle button {
-  min-width: 78px;
-  border: 0;
-  border-radius: 6px;
-  padding: 6px 9px;
-  background: transparent;
-  color: #dbeafe;
   cursor: pointer;
   font-size: 12px;
   font-weight: 800;
+  line-height: 1;
 }
 
-.map-basemap-toggle button.active {
-  background: rgba(255, 255, 255, 0.62);
-  color: #0f172a;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.14);
+.map-basemap-button:hover {
+  background: rgba(255, 255, 255, 0.78);
 }
 
-.map-basemap-toggle button:focus-visible {
+.map-basemap-button:focus-visible {
   outline: 2px solid #bfdbfe;
   outline-offset: 2px;
 }
@@ -810,53 +762,11 @@ textarea {
     min-height: 0;
   }
 
-  .map-status {
-    top: 10px;
-    right: 54px;
-    left: 10px;
-    max-width: none;
-    padding: 8px 10px;
-    border-radius: 8px;
-    font-size: 11px;
-    line-height: 1.25;
-  }
-
-  .map-status strong {
-    margin-bottom: 2px;
-    font-size: 12px;
-  }
-
-  .map-status p {
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-  }
-
-  .session-row {
-    flex-wrap: nowrap;
-    gap: 6px;
-    margin-top: 6px;
-    font-size: 11px;
-  }
-
-  .session-row span {
-    min-width: 0;
-    max-width: 145px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .map-basemap-toggle {
-    width: min(172px, 100%);
-    margin-top: 7px;
-    padding: 2px;
-  }
-
-  .map-basemap-toggle button {
-    min-width: 0;
-    padding: 6px 7px;
+  .map-basemap-button {
+    top: 78px;
+    right: 8px;
+    min-width: 68px;
+    padding: 7px 9px;
     font-size: 11px;
   }
 
@@ -960,10 +870,6 @@ textarea {
 }
 
 @media (max-width: 480px) {
-  .map-status {
-    right: 50px;
-  }
-
   .search-form label {
     gap: 6px;
     font-size: 11px;

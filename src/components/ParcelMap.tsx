@@ -768,22 +768,6 @@ export default function ParcelMap() {
     }
   }
 
-  async function logout() {
-    await fetch("/api/auth/session", { method: "DELETE" }).catch(() => null);
-    setAuthData((current) =>
-      current
-        ? {
-            ...current,
-            authenticated: false,
-            user: null
-          }
-        : current
-    );
-    setSelectedParcel(null);
-    setSearchResults([]);
-    setActivePanel("map");
-  }
-
   async function runSearch(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     const query = searchQuery.trim();
@@ -1001,37 +985,17 @@ export default function ParcelMap() {
   return (
     <div className="map-layout">
       <div className="map-wrap">
-        <div className="map-status">
-          <strong>{activePanel === "measure" ? "Measurement mode" : loading ? "Loading parcels…" : "Parcel layer"}</strong>
-          <p>{activePanel === "measure" ? getMeasurementSummary(measurementMode, measurementPoints).hint : statusMessage}</p>
-          {authData?.authEnabled && authData.authenticated ? (
-            <div className="session-row">
-              <span>{authData.user?.displayName ?? authData.user?.id ?? "Signed in"}</span>
-              <button className="text-button" type="button" onClick={logout}>
-                Sign out
-              </button>
-            </div>
-          ) : null}
-          <div className="map-basemap-toggle" role="group" aria-label="Base map">
-            <button
-              className={basemapMode === "streets" ? "active" : ""}
-              type="button"
-              aria-pressed={basemapMode === "streets"}
-              onClick={() => setBasemapMode("streets")}
-            >
-              Map
-            </button>
-            <button
-              className={basemapMode === "satellite" ? "active" : ""}
-              type="button"
-              aria-pressed={basemapMode === "satellite"}
-              onClick={() => setBasemapMode("satellite")}
-            >
-              Satellite
-            </button>
-          </div>
-        </div>
         <div ref={mapContainerRef} className="map-canvas" />
+        <button
+          className="map-basemap-button"
+          type="button"
+          aria-label={basemapMode === "streets" ? "Switch to satellite view" : "Switch to map view"}
+          aria-pressed={basemapMode === "satellite"}
+          title={basemapMode === "streets" ? "Switch to satellite view" : "Switch to map view"}
+          onClick={() => setBasemapMode((current) => (current === "streets" ? "satellite" : "streets"))}
+        >
+          {basemapMode === "streets" ? "Satellite" : "Map"}
+        </button>
         <Disclaimer />
       </div>
       <ParcelDetails
