@@ -16,8 +16,44 @@ const PARCEL_TILE_SOURCE_ID = "parcel-tiles";
 const PARCEL_TILE_SOURCE_LAYER = "parcels";
 const SATELLITE_SOURCE_ID = "usgs-satellite";
 const SATELLITE_LAYER_ID = "usgs-satellite-layer";
+const PARCEL_TILE_LINE_LAYER_ID = "parcel-tile-line";
+const PARCEL_GEOJSON_LINE_LAYER_ID = "parcel-line";
+const SELECTED_PARCEL_LINE_LAYER_ID = "selected-parcel-line";
+const STREET_PARCEL_LINE_COLOR = "#1d4ed8";
+const SATELLITE_PARCEL_LINE_COLOR = "#ff7a00";
+const STREET_SELECTED_PARCEL_LINE_COLOR = "#ea580c";
+const SATELLITE_SELECTED_PARCEL_LINE_COLOR = "#ff9f1c";
 
 type BasemapMode = "streets" | "satellite";
+type NumberInterpolateExpression = ["interpolate", ["linear"], ["zoom"], number, number, number, number];
+
+function getStreetParcelTileLineOpacity(minZoom: number): NumberInterpolateExpression {
+  return ["interpolate", ["linear"], ["zoom"], minZoom, 0.45, 16, 0.8];
+}
+
+function setParcelBoundaryPaint(map: maplibregl.Map, basemapMode: BasemapMode, minZoom: number) {
+  const isSatellite = basemapMode === "satellite";
+  const parcelLineColor = isSatellite ? SATELLITE_PARCEL_LINE_COLOR : STREET_PARCEL_LINE_COLOR;
+  const selectedLineColor = isSatellite ? SATELLITE_SELECTED_PARCEL_LINE_COLOR : STREET_SELECTED_PARCEL_LINE_COLOR;
+
+  if (map.getLayer(PARCEL_TILE_LINE_LAYER_ID)) {
+    map.setPaintProperty(PARCEL_TILE_LINE_LAYER_ID, "line-color", parcelLineColor);
+    map.setPaintProperty(
+      PARCEL_TILE_LINE_LAYER_ID,
+      "line-opacity",
+      isSatellite ? 0.95 : getStreetParcelTileLineOpacity(minZoom)
+    );
+  }
+
+  if (map.getLayer(PARCEL_GEOJSON_LINE_LAYER_ID)) {
+    map.setPaintProperty(PARCEL_GEOJSON_LINE_LAYER_ID, "line-color", parcelLineColor);
+    map.setPaintProperty(PARCEL_GEOJSON_LINE_LAYER_ID, "line-opacity", isSatellite ? 0.95 : 0.65);
+  }
+
+  if (map.getLayer(SELECTED_PARCEL_LINE_LAYER_ID)) {
+    map.setPaintProperty(SELECTED_PARCEL_LINE_LAYER_ID, "line-color", selectedLineColor);
+  }
+}
 
 function getMapConfig() {
   const centerRaw = process.env.NEXT_PUBLIC_DEFAULT_CENTER ?? "-88.5690,47.1211";
@@ -153,6 +189,7 @@ export default function ParcelMap() {
     if (!map?.getLayer(SATELLITE_LAYER_ID)) return;
 
     map.setLayoutProperty(SATELLITE_LAYER_ID, "visibility", basemapMode === "satellite" ? "visible" : "none");
+    setParcelBoundaryPaint(map, basemapMode, getParcelLayerConfig().minZoom);
   }, [basemapMode]);
 
   useEffect(() => {
@@ -336,22 +373,14 @@ export default function ParcelMap() {
         });
 
         map.addLayer({
-          id: "parcel-tile-line",
+          id: PARCEL_TILE_LINE_LAYER_ID,
           type: "line",
           source: PARCEL_TILE_SOURCE_ID,
           "source-layer": PARCEL_TILE_SOURCE_LAYER,
           minzoom: parcelLayerConfig.minZoom,
           paint: {
-            "line-color": "#1d4ed8",
-            "line-opacity": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              parcelLayerConfig.minZoom,
-              0.45,
-              16,
-              0.8
-            ],
+            "line-color": STREET_PARCEL_LINE_COLOR,
+            "line-opacity": getStreetParcelTileLineOpacity(parcelLayerConfig.minZoom),
             "line-width": [
               "interpolate",
               ["linear"],
@@ -384,14 +413,14 @@ export default function ParcelMap() {
       });
 
       map.addLayer({
-        id: "parcel-line",
+        id: PARCEL_GEOJSON_LINE_LAYER_ID,
         type: "line",
         source: "parcels",
         layout: {
           visibility: parcelLayerConfig.vectorTilesEnabled ? "none" : "visible"
         },
         paint: {
-          "line-color": "#1d4ed8",
+          "line-color": STREET_PARCEL_LINE_COLOR,
           "line-opacity": 0.65,
           "line-width": 1
         }
@@ -408,15 +437,16 @@ export default function ParcelMap() {
       });
 
       map.addLayer({
-        id: "selected-parcel-line",
+        id: SELECTED_PARCEL_LINE_LAYER_ID,
         type: "line",
         source: "selected-parcel",
         paint: {
-          "line-color": "#ea580c",
+          "line-color": STREET_SELECTED_PARCEL_LINE_COLOR,
           "line-width": 3
         }
       });
 
+      setParcelBoundaryPaint(map, basemapModeRef.current, parcelLayerConfig.minZoom);
       queueVisibleParcelLoad(0);
     });
 
