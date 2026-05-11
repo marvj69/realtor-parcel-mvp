@@ -8,6 +8,7 @@ This starter is designed for GitHub + Vercel + Neon and gives a coding agent eno
 
 - Displays an interactive MapLibre map.
 - Uses an OpenFreeMap style by default.
+- Adds a satellite/aerial imagery toggle using a configurable public raster tile source.
 - Looks up parcels from a Neon/PostGIS database by map click.
 - Loads visible parcel outlines by map bounding box.
 - Shows a parcel details drawer.
@@ -81,6 +82,9 @@ DATABASE_URL="postgresql://..."
 ```
 
 For Vercel, use the pooled Neon connection string for runtime usage. If you add `DATABASE_DIRECT_URL`, use it only for scripts/migrations.
+
+Satellite view defaults to the no-key USGS ImageryOnly raster service. Override
+`NEXT_PUBLIC_SATELLITE_TILE_URL` if you prefer a different authorized public tile source.
 
 Optional private-app auth is controlled by server-only env vars. Set `APP_AUTH_PASSWORD` and
 `APP_AUTH_SESSION_SECRET` in Vercel to require a signed session cookie for saved projects/parcels.

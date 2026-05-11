@@ -14,6 +14,10 @@ const EMPTY_FEATURE_COLLECTION: FeatureCollection<Polygon | MultiPolygon, Parcel
 
 const PARCEL_TILE_SOURCE_ID = "parcel-tiles";
 const PARCEL_TILE_SOURCE_LAYER = "parcels";
+const SATELLITE_SOURCE_ID = "usgs-satellite";
+const SATELLITE_LAYER_ID = "usgs-satellite-layer";
+
+type BasemapMode = "streets" | "satellite";
 
 function getMapConfig() {
   const centerRaw = process.env.NEXT_PUBLIC_DEFAULT_CENTER ?? "-88.5690,47.1211";
@@ -23,6 +27,11 @@ function getMapConfig() {
 
   return {
     styleUrl: process.env.NEXT_PUBLIC_MAP_STYLE_URL ?? "https://tiles.openfreemap.org/styles/liberty",
+    satelliteTileUrl:
+      process.env.NEXT_PUBLIC_SATELLITE_TILE_URL ??
+      "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}",
+    satelliteAttribution:
+      process.env.NEXT_PUBLIC_SATELLITE_ATTRIBUTION ?? "USDA, USGS The National Map: Orthoimagery",
     center: [Number.isFinite(lng) ? lng : -88.569, Number.isFinite(lat) ? lat : 47.1211] as [number, number],
     zoom: Number(process.env.NEXT_PUBLIC_DEFAULT_ZOOM ?? 13)
   };
@@ -86,7 +95,9 @@ export default function ParcelMap() {
   const parcelAbortRef = useRef<AbortController | null>(null);
   const parcelDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
+  const basemapModeRef = useRef<BasemapMode>("streets");
   const [selectedParcel, setSelectedParcel] = useState<ParcelFeature | null>(null);
+  const [basemapMode, setBasemapMode] = useState<BasemapMode>("streets");
   const [visibleCount, setVisibleCount] = useState(0);
   const [totalInView, setTotalInView] = useState(0);
   const [statusMessage, setStatusMessage] = useState("Zoom in to view parcels.");
@@ -135,6 +146,14 @@ export default function ParcelMap() {
     void loadSession();
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    basemapModeRef.current = basemapMode;
+    const map = mapRef.current;
+    if (!map?.getLayer(SATELLITE_LAYER_ID)) return;
+
+    map.setLayoutProperty(SATELLITE_LAYER_ID, "visibility", basemapMode === "satellite" ? "visible" : "none");
+  }, [basemapMode]);
 
   useEffect(() => {
     if (authLoading || !authData?.authenticated) return;
@@ -263,6 +282,26 @@ export default function ParcelMap() {
     }
 
     map.on("load", () => {
+      map.addSource(SATELLITE_SOURCE_ID, {
+        type: "raster",
+        tiles: [config.satelliteTileUrl],
+        tileSize: 256,
+        maxzoom: 16,
+        attribution: config.satelliteAttribution
+      });
+
+      map.addLayer({
+        id: SATELLITE_LAYER_ID,
+        type: "raster",
+        source: SATELLITE_SOURCE_ID,
+        layout: {
+          visibility: basemapModeRef.current === "satellite" ? "visible" : "none"
+        },
+        paint: {
+          "raster-opacity": 1
+        }
+      });
+
       map.addSource("parcels", {
         type: "geojson",
         data: EMPTY_FEATURE_COLLECTION
@@ -696,6 +735,24 @@ export default function ParcelMap() {
               </button>
             </div>
           ) : null}
+          <div className="map-basemap-toggle" role="group" aria-label="Base map">
+            <button
+              className={basemapMode === "streets" ? "active" : ""}
+              type="button"
+              aria-pressed={basemapMode === "streets"}
+              onClick={() => setBasemapMode("streets")}
+            >
+              Map
+            </button>
+            <button
+              className={basemapMode === "satellite" ? "active" : ""}
+              type="button"
+              aria-pressed={basemapMode === "satellite"}
+              onClick={() => setBasemapMode("satellite")}
+            >
+              Satellite
+            </button>
+          </div>
         </div>
         <div ref={mapContainerRef} className="map-canvas" />
         <Disclaimer />

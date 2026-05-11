@@ -149,6 +149,41 @@ textarea {
   color: #bfdbfe;
 }
 
+.map-basemap-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  width: fit-content;
+  margin-top: 10px;
+  padding: 3px;
+  border: 1px solid rgba(191, 219, 254, 0.28);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.map-basemap-toggle button {
+  min-width: 78px;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 9px;
+  background: transparent;
+  color: #dbeafe;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.map-basemap-toggle button.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.2);
+}
+
+.map-basemap-toggle button:focus-visible {
+  outline: 2px solid #bfdbfe;
+  outline-offset: 2px;
+}
+
 .disclaimer {
   position: absolute;
   z-index: 1;
