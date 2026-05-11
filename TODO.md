@@ -68,9 +68,8 @@
 ## Live deployment status
 
 - Production URL: `https://realtor-parcel-mvp.vercel.app`
-- Deployment ID: `dpl_9KiySGqHNwXZ7KhoZ5bHMgUZqXFj`
 - GitHub repo: `https://github.com/marvj69/realtor-parcel-mvp`
-- Latest pushed commits: `b4c0726` and follow-up status/doc commit.
+- `main` is pushed to GitHub and Vercel production deploys from it.
 - Neon/PostGIS is working in local and production API routes.
 - Demo fallback remains available when `DATABASE_URL` is missing or still a placeholder.
 
