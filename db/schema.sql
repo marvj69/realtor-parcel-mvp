@@ -2,6 +2,7 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE TABLE IF NOT EXISTS parcel_sources (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -46,6 +47,11 @@ CREATE INDEX IF NOT EXISTS parcels_apn_idx ON parcels (apn);
 CREATE INDEX IF NOT EXISTS parcels_parcel_id_idx ON parcels (parcel_id);
 CREATE INDEX IF NOT EXISTS parcels_owner_name_idx ON parcels (owner_name);
 CREATE INDEX IF NOT EXISTS parcels_site_address_idx ON parcels (site_address);
+CREATE INDEX IF NOT EXISTS parcels_parcel_id_trgm_idx ON parcels USING gin (parcel_id gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS parcels_apn_trgm_idx ON parcels USING gin (apn gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS parcels_owner_name_trgm_idx ON parcels USING gin (owner_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS parcels_site_address_trgm_idx ON parcels USING gin (site_address gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS parcels_mailing_address_trgm_idx ON parcels USING gin (mailing_address gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS parcels_text_search_idx ON parcels USING gin (
   to_tsvector(
     'simple',

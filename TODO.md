@@ -20,10 +20,17 @@
 - [x] Deploy production app to Vercel.
 - [x] Verify live map, parcel click lookup, and save API workflow.
 - [x] Import full Houghton County 2024 parcel dataset into Neon for private app use.
+- [x] Add zoom-aware parcel loading for dense Houghton County views.
+- [x] Add server-side bbox geometry simplification and hard parcel-count caps.
+- [x] Add APN/owner/site-address/mailing-address search panel UI.
+- [x] Add Postgres trigram indexes for parcel search fields.
+- [x] Verify local dense-view, search, click lookup, and save API smoke tests.
 
 ## Parcel map MVP
 
 - [x] Load visible parcels from `/api/parcels/bbox` only when zoomed in enough.
+- [x] Return "zoom in" and "too many parcels" bbox responses instead of huge low-zoom GeoJSON payloads.
+- [x] Simplify bbox parcel geometry by zoom level while keeping full detail for selected parcel lookup.
 - [x] Click parcel and call `/api/parcels/lookup`.
 - [x] Highlight selected parcel.
 - [x] Show details drawer.
@@ -31,7 +38,7 @@
 - [x] Trigger save selected parcel to a project through `/api/saved-parcels`.
 - [x] Trigger private parcel note submission through `/api/saved-parcels`.
 - [x] Persist saved parcels and notes after Neon schema is applied.
-- [ ] Add search by APN/site address/owner.
+- [x] Add search by APN/site address/mailing address/owner.
 - [ ] Add project sidebar.
 
 ## Data ingestion
@@ -65,6 +72,7 @@
 - [ ] Add per-user data ownership.
 - [ ] Add rate limiting.
 - [ ] Add import-job logging.
+- [x] Add geometry, source-key, APN/parcel-ID, owner, site-address, and mailing-address search indexes.
 - [ ] Add faster tiled/vector parcel serving for dense full-county views.
 - [ ] Add monitoring/error logging.
 - [x] Add deployment environment variable documentation.
@@ -77,22 +85,23 @@
 - `main` is pushed to GitHub and Vercel production deploys from it.
 - Neon/PostGIS is working in local and production API routes.
 - Production Neon currently contains `houghton-mi-2024` with 28,602 Houghton County parcels.
+- Latest Houghton performance/search pass adds zoom-aware loading, server-side simplification, hard bbox caps, and search UI.
 - Demo fallback remains available when `DATABASE_URL` is missing or still a placeholder.
 
 ## Current blockers
 
 - [ ] No authentication or per-user data ownership yet, so production use should stay private/internal.
-- [ ] Search API exists, but the search box is not yet exposed in the UI.
 - [ ] Project/sidebar workflow is still minimal; saved parcels persist through the API but are not listed in the UI yet.
-- [ ] Dense Houghton city/area views can hit the current bbox cap and load large GeoJSON responses; optimize this before broader use.
+- [ ] Dense city-center parcel outlines intentionally require zooming farther in; vector tiles would be the next step for effortless full-city parcel rendering.
+- [ ] No API rate limiting or abuse protection yet.
 
 ## Next recommended tasks
 
-- [ ] Add a visible APN/address/owner search box connected to `/api/parcels/search`.
 - [ ] Add a saved-project sidebar that lists saved parcels and notes from Postgres.
 - [ ] Add authentication and per-user project ownership before inviting multiple real users.
-- [ ] Add a printable/exportable parcel brief for selected parcels.
-- [ ] Optimize parcel rendering with smaller bbox caps, server-side simplification, or vector-tile style endpoints.
+- [ ] Add vector-tile parcel serving or tile-cache strategy if full-city outlines need to render without zooming farther in.
+- [ ] Improve search ranking/autocomplete with APN prefix boosts and owner/address grouping.
+- [ ] Add rate limiting and structured API logging for production hardening.
 
 ## Later
 

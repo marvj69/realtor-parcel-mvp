@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import maplibregl from "maplibre-gl";
 import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
 import Disclaimer from "@/components/Disclaimer";
 import ParcelDetails from "@/components/ParcelDetails";
-import type { ParcelFeature, ParcelProperties } from "@/types/parcel";
+import type { ParcelFeature, ParcelProperties, ParcelSearchResult } from "@/types/parcel";
 
 const EMPTY_FEATURE_COLLECTION: FeatureCollection<Polygon | MultiPolygon, ParcelProperties> = {
   type: "FeatureCollection",
@@ -34,13 +34,40 @@ function setGeoJsonSourceData(
   if (source) source.setData(data);
 }
 
+type BboxPayload = {
+  ok?: boolean;
+  data?: FeatureCollection<Polygon | MultiPolygon, ParcelProperties>;
+  count?: number;
+  limit?: number;
+  minZoom?: number;
+  message?: string;
+  tooMany?: boolean;
+  shouldLoad?: boolean;
+  error?: string;
+};
+
+type SearchPayload = {
+  ok?: boolean;
+  data?: ParcelSearchResult[];
+  error?: string;
+};
+
 export default function ParcelMap() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const parcelAbortRef = useRef<AbortController | null>(null);
+  const parcelDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
   const [selectedParcel, setSelectedParcel] = useState<ParcelFeature | null>(null);
   const [visibleCount, setVisibleCount] = useState(0);
+  const [totalInView, setTotalInView] = useState(0);
+  const [statusMessage, setStatusMessage] = useState("Zoom in to view parcels.");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<ParcelSearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -57,40 +84,99 @@ export default function ParcelMap() {
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
     mapRef.current = map;
 
+    function clearParcels(message: string) {
+      setGeoJsonSourceData(map, "parcels", EMPTY_FEATURE_COLLECTION);
+      setVisibleCount(0);
+      setTotalInView(0);
+      setStatusMessage(message);
+    }
+
     async function loadVisibleParcels() {
       if (!mapRef.current) return;
       const zoom = mapRef.current.getZoom();
       const minZoom = Number(process.env.NEXT_PUBLIC_PARCEL_MIN_ZOOM ?? 13);
 
       if (zoom < minZoom) {
-        setGeoJsonSourceData(mapRef.current, "parcels", EMPTY_FEATURE_COLLECTION);
-        setVisibleCount(0);
+        parcelAbortRef.current?.abort();
+        clearParcels("Zoom in to view parcels.");
         return;
       }
 
       const bounds = mapRef.current.getBounds();
-      const bbox = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()].join(",");
+      const params = new URLSearchParams({
+        west: String(bounds.getWest()),
+        south: String(bounds.getSouth()),
+        east: String(bounds.getEast()),
+        north: String(bounds.getNorth()),
+        zoom: String(zoom)
+      });
+
+      parcelAbortRef.current?.abort();
+      const controller = new AbortController();
+      parcelAbortRef.current = controller;
 
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/parcels/bbox?bbox=${encodeURIComponent(bbox)}`);
-        const payload = (await response.json()) as {
-          ok?: boolean;
-          data?: FeatureCollection<Polygon | MultiPolygon, ParcelProperties>;
-          error?: string;
-        };
+        const response = await fetch(`/api/parcels/bbox?${params.toString()}`, { signal: controller.signal });
+        const payload = (await response.json()) as BboxPayload;
 
-        if (!response.ok || !payload.ok || !payload.data) {
+        if (!response.ok || !payload.ok) {
           throw new Error(payload.error ?? "Unable to load visible parcels");
         }
 
-        setGeoJsonSourceData(mapRef.current, "parcels", payload.data);
-        setVisibleCount(payload.data.features.length);
+        const data = payload.data ?? EMPTY_FEATURE_COLLECTION;
+        setGeoJsonSourceData(mapRef.current, "parcels", data);
+        setVisibleCount(data.features.length);
+        setTotalInView(payload.count ?? data.features.length);
+        setStatusMessage(
+          payload.message ??
+            `${data.features.length.toLocaleString()} parcel outline${data.features.length === 1 ? "" : "s"} loaded.`
+        );
       } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
         setError(err instanceof Error ? err.message : "Unable to load visible parcels");
       } finally {
-        setLoading(false);
+        if (parcelAbortRef.current === controller) {
+          setLoading(false);
+        }
+      }
+    }
+
+    function queueVisibleParcelLoad(delay = 220) {
+      if (parcelDebounceRef.current) clearTimeout(parcelDebounceRef.current);
+      parcelDebounceRef.current = setTimeout(() => {
+        void loadVisibleParcels();
+      }, delay);
+    }
+
+    function setSelectedParcelFeature(nextParcel: ParcelFeature | null) {
+      setSelectedParcel(nextParcel);
+      setGeoJsonSourceData(
+        map,
+        "selected-parcel",
+        nextParcel
+          ? {
+              type: "FeatureCollection",
+              features: [nextParcel]
+            }
+          : EMPTY_FEATURE_COLLECTION
+      );
+    }
+
+    async function selectParcelAt(lng: number, lat: number) {
+      setError(null);
+      try {
+        const response = await fetch(`/api/parcels/lookup?lng=${lng}&lat=${lat}`);
+        const payload = (await response.json()) as { ok?: boolean; data?: ParcelFeature | null; error?: string };
+
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error ?? "Unable to look up parcel");
+        }
+
+        setSelectedParcelFeature(payload.data ?? null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unable to look up parcel");
       }
     }
 
@@ -146,60 +232,120 @@ export default function ParcelMap() {
         }
       });
 
-      void loadVisibleParcels();
+      queueVisibleParcelLoad(0);
     });
 
     map.on("moveend", () => {
-      void loadVisibleParcels();
+      queueVisibleParcelLoad();
     });
 
     map.on("click", async (event) => {
-      setError(null);
-      try {
-        const lng = event.lngLat.lng;
-        const lat = event.lngLat.lat;
-        const response = await fetch(`/api/parcels/lookup?lng=${lng}&lat=${lat}`);
-        const payload = (await response.json()) as { ok?: boolean; data?: ParcelFeature | null; error?: string };
-
-        if (!response.ok || !payload.ok) {
-          throw new Error(payload.error ?? "Unable to look up parcel");
-        }
-
-        const nextParcel = payload.data ?? null;
-        setSelectedParcel(nextParcel);
-
-        setGeoJsonSourceData(
-          map,
-          "selected-parcel",
-          nextParcel
-            ? {
-                type: "FeatureCollection",
-                features: [nextParcel]
-              }
-            : EMPTY_FEATURE_COLLECTION
-        );
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unable to look up parcel");
-      }
+      await selectParcelAt(event.lngLat.lng, event.lngLat.lat);
     });
 
     return () => {
+      parcelAbortRef.current?.abort();
+      if (parcelDebounceRef.current) clearTimeout(parcelDebounceRef.current);
       map.remove();
       mapRef.current = null;
     };
   }, []);
 
+  async function runSearch(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    const query = searchQuery.trim();
+
+    if (query.length < 2) {
+      setSearchError("Enter at least 2 characters.");
+      setSearchResults([]);
+      return;
+    }
+
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
+    setSearchLoading(true);
+    setSearchError(null);
+
+    try {
+      const params = new URLSearchParams({ q: query, limit: "12" });
+      const response = await fetch(`/api/parcels/search?${params.toString()}`, { signal: controller.signal });
+      const payload = (await response.json()) as SearchPayload;
+
+      if (!response.ok || !payload.ok || !payload.data) {
+        throw new Error(payload.error ?? "Parcel search failed");
+      }
+
+      setSearchResults(payload.data);
+      if (payload.data.length === 0) setSearchError("No parcel matches found.");
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      setSearchError(err instanceof Error ? err.message : "Parcel search failed");
+    } finally {
+      if (searchAbortRef.current === controller) setSearchLoading(false);
+    }
+  }
+
+  async function selectSearchResult(result: ParcelSearchResult) {
+    if (!result.center) return;
+    const [lng, lat] = result.center.coordinates;
+    const map = mapRef.current;
+
+    if (map) {
+      map.flyTo({
+        center: [lng, lat],
+        zoom: Math.max(map.getZoom(), 17),
+        duration: 700,
+        essential: true
+      });
+    }
+
+    try {
+      const response = await fetch(`/api/parcels/lookup?lng=${lng}&lat=${lat}`);
+      const payload = (await response.json()) as { ok?: boolean; data?: ParcelFeature | null; error?: string };
+      if (!response.ok || !payload.ok) throw new Error(payload.error ?? "Unable to load selected parcel");
+
+      const nextParcel = payload.data ?? null;
+      setSelectedParcel(nextParcel);
+      const selectedSource = map?.getSource("selected-parcel") as maplibregl.GeoJSONSource | undefined;
+      selectedSource?.setData(
+        nextParcel
+          ? {
+              type: "FeatureCollection",
+              features: [nextParcel]
+            }
+          : EMPTY_FEATURE_COLLECTION
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load selected parcel");
+    }
+  }
+
   return (
     <div className="map-layout">
       <div className="map-wrap">
         <div className="map-status">
-          <strong>Click a parcel to inspect it</strong>
-          <p>Start with the seed data, then import real public county GIS parcels.</p>
+          <strong>{loading ? "Loading parcels…" : "Parcel layer"}</strong>
+          <p>{statusMessage}</p>
         </div>
         <div ref={mapContainerRef} className="map-canvas" />
         <Disclaimer />
       </div>
-      <ParcelDetails parcel={selectedParcel} visibleCount={visibleCount} loading={loading} error={error} />
+      <ParcelDetails
+        parcel={selectedParcel}
+        visibleCount={visibleCount}
+        totalInView={totalInView}
+        loading={loading}
+        error={error}
+        statusMessage={statusMessage}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        onSearchSubmit={runSearch}
+        searchResults={searchResults}
+        searchLoading={searchLoading}
+        searchError={searchError}
+        onSearchResultClick={selectSearchResult}
+      />
     </div>
   );
 }
