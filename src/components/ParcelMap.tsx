@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import maplibregl from "maplibre-gl";
-import { area as turfArea, length as turfLength, lineString as turfLineString, polygon as turfPolygon } from "@turf/turf";
+import { area as turfArea, bbox as turfBbox, length as turfLength, lineString as turfLineString, polygon as turfPolygon } from "@turf/turf";
 import type { Feature, FeatureCollection, Geometry, MultiPolygon, Polygon, Position } from "geojson";
 import Disclaimer from "@/components/Disclaimer";
 import ParcelDetails from "@/components/ParcelDetails";
@@ -34,6 +34,10 @@ const STREET_PARCEL_LINE_COLOR = "#1d4ed8";
 const SATELLITE_PARCEL_LINE_COLOR = "#ff7a00";
 const STREET_SELECTED_PARCEL_LINE_COLOR = "#ea580c";
 const SATELLITE_SELECTED_PARCEL_LINE_COLOR = "#ff9f1c";
+const SELECTED_PARCEL_TOP_PADDING = 76;
+const SELECTED_PARCEL_SIDE_PADDING = 24;
+const SELECTED_PARCEL_BOTTOM_MARGIN = 36;
+const SELECTED_PARCEL_MIN_BOTTOM_PADDING = 160;
 
 type MeasurementFeatureProperties = {
   kind: "line" | "shape" | "point";
@@ -111,6 +115,63 @@ function setMeasurementSourceData(
 ) {
   const source = map.getSource(MEASUREMENT_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
   if (source) source.setData(data);
+}
+
+function getSelectedParcelCameraPadding(map: maplibregl.Map): maplibregl.PaddingOptions {
+  const container = map.getContainer();
+  const containerHeight = container.clientHeight;
+  const containerWidth = container.clientWidth;
+  const sidePadding = containerWidth < 720 ? 18 : SELECTED_PARCEL_SIDE_PADDING;
+  const fallbackPanelHeight = Math.min(containerHeight * (containerWidth < 720 ? 0.54 : 0.5), containerWidth < 720 ? 500 : 520);
+  let coveredPanelHeight = fallbackPanelHeight;
+
+  const panel = document.querySelector<HTMLElement>(".side-panel:not(.collapsed)");
+  if (panel) {
+    const mapRect = container.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    coveredPanelHeight = Math.max(0, mapRect.bottom - Math.max(mapRect.top, panelRect.top));
+  }
+
+  const top = containerWidth < 720 ? 72 : SELECTED_PARCEL_TOP_PADDING;
+  const maxBottom = Math.max(80, containerHeight - top - 96);
+  const bottom = Math.min(
+    Math.max(coveredPanelHeight + SELECTED_PARCEL_BOTTOM_MARGIN, SELECTED_PARCEL_MIN_BOTTOM_PADDING),
+    maxBottom
+  );
+
+  return {
+    top,
+    right: sidePadding,
+    bottom,
+    left: sidePadding
+  };
+}
+
+function focusMapOnSelectedParcel(map: maplibregl.Map, parcel: ParcelFeature) {
+  const [west, south, east, north] = turfBbox(parcel);
+  if (![west, south, east, north].every(Number.isFinite)) return;
+
+  const center: [number, number] = [(west + east) / 2, (south + north) / 2];
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (!map.getContainer().isConnected) return;
+
+      const padding = getSelectedParcelCameraPadding(map);
+      const bounds = new maplibregl.LngLatBounds([west, south], [east, north]);
+      const camera = map.cameraForBounds(bounds, {
+        padding,
+        maxZoom: Math.max(map.getZoom(), 17)
+      });
+
+      map.easeTo({
+        center: camera?.center ?? center,
+        zoom: camera?.zoom ?? Math.max(map.getZoom(), 17),
+        duration: 700,
+        essential: true
+      });
+    });
+  });
 }
 
 function pointPosition(point: MeasurementPoint): Position {
@@ -500,6 +561,7 @@ export default function ParcelMap() {
             }
           : EMPTY_FEATURE_COLLECTION
       );
+      if (nextParcel) focusMapOnSelectedParcel(map, nextParcel);
     }
 
     async function selectParcelAt(lng: number, lat: number) {
@@ -808,15 +870,6 @@ export default function ParcelMap() {
     const [lng, lat] = result.center.coordinates;
     const map = mapRef.current;
 
-    if (map) {
-      map.flyTo({
-        center: [lng, lat],
-        zoom: Math.max(map.getZoom(), 17),
-        duration: 700,
-        essential: true
-      });
-    }
-
     try {
       const response = await fetch(`/api/parcels/lookup?lng=${lng}&lat=${lat}`);
       const payload = (await response.json()) as { ok?: boolean; data?: ParcelFeature | null; error?: string };
@@ -834,6 +887,7 @@ export default function ParcelMap() {
             }
           : EMPTY_FEATURE_COLLECTION
       );
+      if (map && nextParcel) focusMapOnSelectedParcel(map, nextParcel);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load selected parcel");
     }
