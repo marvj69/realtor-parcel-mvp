@@ -115,21 +115,21 @@ textarea {
 .map-basemap-button {
   position: absolute;
   z-index: 2;
-  top: 86px;
-  right: 12px;
-  min-width: 76px;
+  top: 88px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
   border: 1px solid var(--glass-border);
   border-radius: 8px;
-  padding: 7px 10px;
+  padding: 0;
   background: var(--glass-panel-strong);
   color: #0f172a;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1;
 }
 
 .map-basemap-button:hover {
@@ -139,6 +139,24 @@ textarea {
 .map-basemap-button:focus-visible {
   outline: 2px solid #bfdbfe;
   outline-offset: 2px;
+}
+
+.map-basemap-icon {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+
+.map-basemap-icon svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.1;
 }
 
 .disclaimer {
@@ -763,11 +781,10 @@ textarea {
   }
 
   .map-basemap-button {
-    top: 78px;
+    top: 84px;
     right: 8px;
-    min-width: 68px;
-    padding: 7px 9px;
-    font-size: 11px;
+    width: 32px;
+    height: 32px;
   }
 
   .disclaimer {

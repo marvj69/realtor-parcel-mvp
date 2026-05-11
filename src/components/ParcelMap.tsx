@@ -49,6 +49,26 @@ type MeasurementFeatureProperties = {
 type BasemapMode = "streets" | "satellite";
 type NumberInterpolateExpression = ["interpolate", ["linear"], ["zoom"], number, number, number, number];
 
+function GlobeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17" />
+      <path d="M12 3.5c2.2 2.3 3.4 5.1 3.4 8.5s-1.2 6.2-3.4 8.5" />
+      <path d="M12 3.5C9.8 5.8 8.6 8.6 8.6 12s1.2 6.2 3.4 8.5" />
+    </svg>
+  );
+}
+
+function TreeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M12 3.5 5.8 12h3.1l-4 5.3h14.2l-4-5.3h3.1L12 3.5Z" />
+      <path d="M12 17.3v3.2" />
+    </svg>
+  );
+}
+
 function getStreetParcelTileLineOpacity(minZoom: number): NumberInterpolateExpression {
   return ["interpolate", ["linear"], ["zoom"], minZoom, 0.45, 16, 0.8];
 }
@@ -1070,7 +1090,7 @@ export default function ParcelMap() {
           title={basemapMode === "streets" ? "Switch to satellite view" : "Switch to map view"}
           onClick={() => setBasemapMode((current) => (current === "streets" ? "satellite" : "streets"))}
         >
-          {basemapMode === "streets" ? "Satellite" : "Map"}
+          <span className="map-basemap-icon">{basemapMode === "streets" ? <TreeIcon /> : <GlobeIcon />}</span>
         </button>
         <Disclaimer />
       </div>
