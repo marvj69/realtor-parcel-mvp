@@ -21,6 +21,25 @@ type CountySource = {
   fieldMap: FieldMap;
 };
 
+type ParcelImportRecord = {
+  sourceKey: string;
+  sourceFeatureId: string;
+  provider: string;
+  sourceCounty: string | null;
+  state: string | null;
+  parcelId: string | null;
+  apn: string | null;
+  ownerName: string | null;
+  siteAddress: string | null;
+  mailingAddress: string | null;
+  acreage: number | null;
+  assessedValue: number | null;
+  landUse: string | null;
+  legalDescription: string | null;
+  raw: string;
+  geometry: string;
+};
+
 function getArg(name: string): string | undefined {
   const prefix = `--${name}=`;
   const found = process.argv.find((arg) => arg.startsWith(prefix));
@@ -71,6 +90,83 @@ function toMultiPolygonGeometry(geometry: Geometry | null): Polygon | MultiPolyg
   if (!geometry) return null;
   if (geometry.type === "Polygon" || geometry.type === "MultiPolygon") return geometry;
   return null;
+}
+
+async function insertParcelBatch(client: Client, records: ParcelImportRecord[]) {
+  if (records.length === 0) return;
+
+  const columnsPerRow = 16;
+  const params: unknown[] = [];
+  const values = records.map((record, rowIndex) => {
+    params.push(
+      record.sourceKey,
+      record.sourceFeatureId,
+      record.provider,
+      record.sourceCounty,
+      record.state,
+      record.parcelId,
+      record.apn,
+      record.ownerName,
+      record.siteAddress,
+      record.mailingAddress,
+      record.acreage,
+      record.assessedValue,
+      record.landUse,
+      record.legalDescription,
+      record.raw,
+      record.geometry
+    );
+
+    const offset = rowIndex * columnsPerRow;
+    const placeholders = Array.from({ length: columnsPerRow }, (_, index) => `$${offset + index + 1}`);
+
+    return `(
+      ${placeholders[0]}, ${placeholders[1]}, ${placeholders[2]}, ${placeholders[3]}, ${placeholders[4]},
+      ${placeholders[5]}, ${placeholders[6]}, ${placeholders[7]}, ${placeholders[8]}, ${placeholders[9]},
+      ${placeholders[10]}, ${placeholders[11]}, ${placeholders[12]}, ${placeholders[13]}, ${placeholders[14]}::jsonb,
+      ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON(${placeholders[15]}), 4326))
+    )`;
+  });
+
+  await client.query(
+    `
+    INSERT INTO parcels (
+      source_key,
+      source_feature_id,
+      provider,
+      source_county,
+      state,
+      parcel_id,
+      apn,
+      owner_name,
+      site_address,
+      mailing_address,
+      acreage,
+      assessed_value,
+      land_use,
+      legal_description,
+      raw,
+      geom
+    ) VALUES ${values.join(",")}
+    ON CONFLICT (source_key, source_feature_id)
+    DO UPDATE SET
+      provider = EXCLUDED.provider,
+      source_county = EXCLUDED.source_county,
+      state = EXCLUDED.state,
+      parcel_id = EXCLUDED.parcel_id,
+      apn = EXCLUDED.apn,
+      owner_name = EXCLUDED.owner_name,
+      site_address = EXCLUDED.site_address,
+      mailing_address = EXCLUDED.mailing_address,
+      acreage = EXCLUDED.acreage,
+      assessed_value = EXCLUDED.assessed_value,
+      land_use = EXCLUDED.land_use,
+      legal_description = EXCLUDED.legal_description,
+      raw = EXCLUDED.raw,
+      geom = EXCLUDED.geom
+    `,
+    params
+  );
 }
 
 async function main() {
@@ -132,6 +228,8 @@ async function main() {
 
     let imported = 0;
     let skipped = 0;
+    const batchSize = Math.max(1, Math.min(Number(getArg("batchSize") ?? 500) || 500, 1000));
+    let batch: ParcelImportRecord[] = [];
 
     for (const feature of geojson.features as Feature[]) {
       const properties = (feature.properties ?? {}) as Record<string, unknown>;
@@ -157,72 +255,34 @@ async function main() {
       const landUse = asString(pick(properties, source.fieldMap.landUse));
       const legalDescription = asString(pick(properties, source.fieldMap.legalDescription));
 
-      await client.query(
-        `
-        INSERT INTO parcels (
-          source_key,
-          source_feature_id,
-          provider,
-          source_county,
-          state,
-          parcel_id,
-          apn,
-          owner_name,
-          site_address,
-          mailing_address,
-          acreage,
-          assessed_value,
-          land_use,
-          legal_description,
-          raw,
-          geom
-        ) VALUES (
-          $1, $2, $3, $4, $5,
-          $6, $7, $8, $9, $10,
-          $11, $12, $13, $14, $15::jsonb,
-          ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($16), 4326))
-        )
-        ON CONFLICT (source_key, source_feature_id)
-        DO UPDATE SET
-          provider = EXCLUDED.provider,
-          source_county = EXCLUDED.source_county,
-          state = EXCLUDED.state,
-          parcel_id = EXCLUDED.parcel_id,
-          apn = EXCLUDED.apn,
-          owner_name = EXCLUDED.owner_name,
-          site_address = EXCLUDED.site_address,
-          mailing_address = EXCLUDED.mailing_address,
-          acreage = EXCLUDED.acreage,
-          assessed_value = EXCLUDED.assessed_value,
-          land_use = EXCLUDED.land_use,
-          legal_description = EXCLUDED.legal_description,
-          raw = EXCLUDED.raw,
-          geom = EXCLUDED.geom
-        `,
-        [
-          source.sourceKey,
-          sourceFeatureId,
-          source.provider,
-          source.county ?? null,
-          source.state ?? null,
-          parcelId,
-          apn,
-          ownerName,
-          siteAddress,
-          mailingAddress,
-          acreage,
-          assessedValue,
-          landUse,
-          legalDescription,
-          JSON.stringify(properties),
-          JSON.stringify(geometry)
-        ]
-      );
-
+      batch.push({
+        sourceKey: source.sourceKey,
+        sourceFeatureId,
+        provider: source.provider,
+        sourceCounty: source.county ?? null,
+        state: source.state ?? null,
+        parcelId,
+        apn,
+        ownerName,
+        siteAddress,
+        mailingAddress,
+        acreage,
+        assessedValue,
+        landUse,
+        legalDescription,
+        raw: JSON.stringify(properties),
+        geometry: JSON.stringify(geometry)
+      });
       imported += 1;
-      if (imported % 500 === 0) console.log(`Imported ${imported} parcels...`);
+
+      if (batch.length >= batchSize) {
+        await insertParcelBatch(client, batch);
+        batch = [];
+        console.log(`Imported ${imported} parcels...`);
+      }
     }
 
+    await insertParcelBatch(client, batch);
     await client.query("COMMIT");
     console.log(`Done. Imported/updated ${imported} parcels. Skipped ${skipped} unsupported geometries.`);
   } catch (err) {
