@@ -49,37 +49,6 @@ textarea {
   overflow: hidden;
 }
 
-.topbar {
-  height: 72px;
-  flex: 0 0 72px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 18px;
-  color: white;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.topbar h1 {
-  margin: 0;
-  font-size: 22px;
-  line-height: 1.1;
-}
-
-.eyebrow {
-  margin: 0 0 4px;
-  color: #cbd5e1;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.topbar-note {
-  color: #cbd5e1;
-  font-size: 13px;
-}
-
 .map-layout {
   position: relative;
   min-height: 0;
@@ -831,21 +800,6 @@ textarea {
 }
 
 @media (max-width: 900px) {
-  .topbar {
-    height: 56px;
-    flex-basis: 56px;
-    padding: 9px 12px;
-  }
-
-  .topbar h1 {
-    font-size: 19px;
-  }
-
-  .eyebrow,
-  .topbar-note {
-    display: none;
-  }
-
   .auth-panel {
     max-height: calc(100dvh - 88px);
     margin: 16px auto;
