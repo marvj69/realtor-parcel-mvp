@@ -9,13 +9,13 @@
   --accent-dark: #1d4ed8;
   --danger: #b91c1c;
   --success: #047857;
-  --glass-panel: rgba(255, 255, 255, 0.76);
-  --glass-panel-strong: rgba(255, 255, 255, 0.84);
-  --glass-panel-soft: rgba(248, 250, 252, 0.64);
-  --glass-panel-muted: rgba(226, 232, 240, 0.58);
-  --glass-border: rgba(219, 227, 238, 0.72);
-  --glass-dark: rgba(15, 23, 42, 0.62);
-  --glass-blur: blur(5px) saturate(1.12);
+  --glass-panel: rgba(255, 255, 255, 0.58);
+  --glass-panel-strong: rgba(255, 255, 255, 0.68);
+  --glass-panel-soft: rgba(248, 250, 252, 0.42);
+  --glass-panel-muted: rgba(226, 232, 240, 0.38);
+  --glass-border: rgba(219, 227, 238, 0.46);
+  --glass-dark: rgba(15, 23, 42, 0.48);
+  --glass-blur: blur(2.5px) saturate(1.06);
 }
 
 * {
@@ -100,7 +100,7 @@ textarea {
   border: 1px solid var(--glass-border);
   border-radius: 8px;
   background: var(--glass-panel);
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.1);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
 }
@@ -153,7 +153,7 @@ textarea {
   border-radius: 8px;
   background: var(--glass-dark);
   color: white;
-  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.25);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   font-size: 13px;
@@ -192,7 +192,7 @@ textarea {
   padding: 3px;
   border: 1px solid rgba(191, 219, 254, 0.28);
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.36);
+  background: rgba(15, 23, 42, 0.26);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
 }
@@ -210,9 +210,9 @@ textarea {
 }
 
 .map-basemap-toggle button.active {
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.62);
   color: #0f172a;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.14);
 }
 
 .map-basemap-toggle button:focus-visible {
@@ -228,9 +228,9 @@ textarea {
   max-width: 620px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.54);
   color: #334155;
-  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   font-size: 12px;
@@ -255,7 +255,7 @@ textarea {
   background: var(--glass-panel);
   border: 1px solid var(--glass-border);
   border-radius: 8px;
-  box-shadow: 0 22px 70px rgba(15, 23, 42, 0.24);
+  box-shadow: 0 18px 52px rgba(15, 23, 42, 0.18);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
 }
@@ -284,7 +284,7 @@ textarea {
 .side-panel.collapsed .bottom-tab-bar {
   border: 1px solid var(--glass-border);
   border-radius: 8px;
-  box-shadow: 0 16px 46px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.14);
 }
 
 .bottom-tab-bar button {
@@ -304,7 +304,7 @@ textarea {
 }
 
 .bottom-tab-bar button.active {
-  background: rgba(15, 23, 42, 0.76);
+  background: rgba(15, 23, 42, 0.62);
   color: #ffffff;
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -366,7 +366,7 @@ textarea {
 }
 
 .search-panel {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.66), rgba(248, 250, 252, 0.5));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.46), rgba(248, 250, 252, 0.32));
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
 }
@@ -426,7 +426,7 @@ textarea {
 
 .search-result:hover {
   border-color: #93c5fd;
-  background: rgba(239, 246, 255, 0.76);
+  background: rgba(239, 246, 255, 0.56);
 }
 
 .search-result:disabled {
@@ -442,7 +442,7 @@ textarea {
 }
 
 .saved-projects-panel {
-  background: rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.42);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
 }
@@ -630,7 +630,7 @@ textarea {
 .measure-mode-row button.active {
   background: var(--glass-panel-strong);
   color: #0f172a;
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.1);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
 }
 
 .measurement-readout {
@@ -639,7 +639,7 @@ textarea {
   padding: 14px;
   border: 1px solid #99f6e4;
   border-radius: 8px;
-  background: rgba(240, 253, 250, 0.72);
+  background: rgba(240, 253, 250, 0.52);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
 }
@@ -775,14 +775,14 @@ textarea {
 }
 
 .primary-button {
-  background: rgba(37, 99, 235, 0.78);
+  background: rgba(37, 99, 235, 0.68);
   color: white;
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .primary-button:hover {
-  background: rgba(29, 78, 216, 0.84);
+  background: rgba(29, 78, 216, 0.76);
 }
 
 .primary-button:disabled {
@@ -819,7 +819,7 @@ textarea {
   padding: 10px;
   border: 1px solid #fde68a;
   border-radius: 8px;
-  background: rgba(255, 251, 235, 0.74);
+  background: rgba(255, 251, 235, 0.54);
   color: #713f12 !important;
   font-size: 12px;
   backdrop-filter: var(--glass-blur);
@@ -938,7 +938,7 @@ textarea {
     width: min(720px, calc(100% - 16px));
     max-height: min(54dvh, 500px);
     border: 1px solid var(--glass-border);
-    box-shadow: 0 -16px 42px rgba(15, 23, 42, 0.18);
+    box-shadow: 0 -14px 36px rgba(15, 23, 42, 0.14);
   }
 
   .side-panel.collapsed {
