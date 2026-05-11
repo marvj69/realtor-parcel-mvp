@@ -54,6 +54,7 @@ export default function SavedProjectsSidebar({ refreshKey, activeParcelId, onPro
   const [error, setError] = useState<string | null>(null);
   const [demo, setDemo] = useState(false);
   const [manualRefreshKey, setManualRefreshKey] = useState(0);
+  const [collapseProjectsByDefault, setCollapseProjectsByDefault] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -88,6 +89,15 @@ export default function SavedProjectsSidebar({ refreshKey, activeParcelId, onPro
     return () => controller.abort();
   }, [refreshKey, manualRefreshKey]);
 
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 900px)");
+    const updateProjectDensity = () => setCollapseProjectsByDefault(media.matches);
+
+    updateProjectDensity();
+    media.addEventListener("change", updateProjectDensity);
+    return () => media.removeEventListener("change", updateProjectDensity);
+  }, []);
+
   return (
     <section className="panel-section saved-projects-panel" aria-labelledby="saved-projects-heading">
       <div className="section-heading-row">
@@ -108,7 +118,14 @@ export default function SavedProjectsSidebar({ refreshKey, activeParcelId, onPro
       ) : (
         <div className="saved-project-list">
           {projects.map((project, index) => (
-            <details className="saved-project" key={project.id} open={index === 0 || project.savedParcels.some((saved) => saved.parcel.id === activeParcelId)}>
+            <details
+              className="saved-project"
+              key={project.id}
+              open={
+                project.savedParcels.some((saved) => saved.parcel.id === activeParcelId) ||
+                (!collapseProjectsByDefault && index === 0)
+              }
+            >
               <summary>
                 <span>
                   <strong>{project.name}</strong>

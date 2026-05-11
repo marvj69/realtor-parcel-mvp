@@ -202,10 +202,12 @@ export default function ParcelMap() {
       style: config.styleUrl,
       center: config.center,
       zoom: config.zoom,
-      attributionControl: { compact: false }
+      attributionControl: {
+        compact: window.matchMedia("(max-width: 700px)").matches
+      }
     });
 
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false, visualizePitch: false }), "top-right");
     mapRef.current = map;
     const parcelLayerConfig = getParcelLayerConfig();
 

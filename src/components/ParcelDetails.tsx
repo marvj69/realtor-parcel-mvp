@@ -181,7 +181,7 @@ export default function ParcelDetails({
         onSavedParcelSelect={onSavedParcelClick}
       />
 
-      <section className="panel-section">
+      <section className="panel-section lookup-panel">
         <h2>Parcel lookup</h2>
         <p>
           {loading

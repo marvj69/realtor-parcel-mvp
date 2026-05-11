@@ -139,7 +139,7 @@ async function getParcelBbox(request: Request) {
         shouldLoad: true,
         simplified: policy.simplified,
         vectorTiles: true,
-        message: `${count.toLocaleString()} parcels available as vector tiles. Click a parcel for full details.`
+        message: `${count.toLocaleString()} parcels in view. Tap or click a parcel for details.`
       });
     }
 
