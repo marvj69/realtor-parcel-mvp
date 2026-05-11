@@ -89,6 +89,11 @@ textarea {
 }
 
 .map-wrap {
+  --map-control-gutter: 10px;
+  --map-control-stack-top: 10px;
+  --map-control-size: 29px;
+  --map-control-stack-gap: 8px;
+
   position: absolute;
   inset: 0;
   min-width: 0;
@@ -115,12 +120,12 @@ textarea {
 .map-basemap-button {
   position: absolute;
   z-index: 2;
-  top: 88px;
-  right: 10px;
+  top: calc(var(--map-control-stack-top) + (var(--map-control-size) * 2) + var(--map-control-stack-gap));
+  right: var(--map-control-gutter);
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: var(--map-control-size);
+  height: var(--map-control-size);
   border: 1px solid var(--glass-border);
   border-radius: 8px;
   padding: 0;
@@ -777,14 +782,15 @@ textarea {
   }
 
   .map-wrap {
+    --map-control-gutter: 18px;
+    --map-control-stack-top: 18px;
+    --map-control-size: 32px;
+
     min-height: 0;
   }
 
   .map-basemap-button {
-    top: 84px;
-    right: 8px;
-    width: 32px;
-    height: 32px;
+    border-radius: 8px;
   }
 
   .disclaimer {
