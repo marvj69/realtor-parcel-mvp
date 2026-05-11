@@ -8,6 +8,9 @@
     "sourceUrl": "REPLACE_WITH_VALID_ARCGIS_FEATURESERVER_LAYER_QUERY_URL_OR_LAYER_URL",
     "sourceUpdatedAt": null,
     "inputFile": "data/parcels/houghton-mi-example.geojson",
+    "refreshCadence": "monthly metadata check; quarterly full refresh",
+    "lastRefreshReviewedAt": null,
+    "refreshNotes": "Follow docs/DATA_REFRESH_SCHEDULE.md before refreshing production parcel data.",
     "notes": "Replace URL and field names after validating the actual public GIS source.",
     "fieldMap": {
       "sourceFeatureId": ["OBJECTID", "FID", "ID"],

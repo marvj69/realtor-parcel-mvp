@@ -46,6 +46,7 @@ TypeScript
 │   └── seed.sql
 ├── docs/
 │   ├── DATA_SOURCE_PLAYBOOK.md
+│   ├── DATA_REFRESH_SCHEDULE.md
 │   ├── DEPLOYMENT.md
 │   ├── DISCLAIMERS.md
 │   ├── MVP_SPEC.md
@@ -134,6 +135,12 @@ npm run parcels:import -- --config=config/county-sources.local.json --source=hou
 npm run parcels:fetch -- --config=config/county-sources.local.json --source=houghton-mi-example
 npm run parcels:import -- --config=config/county-sources.local.json --source=houghton-mi-example
 ```
+
+## Refresh parcel sources
+
+Use the manual cadence and runbook in `docs/DATA_REFRESH_SCHEDULE.md` before
+refreshing production parcel data. Do not enable automated data-source refreshes
+until import-job logging and failure reporting are in place.
 
 ## Important implementation notes
 

@@ -82,7 +82,7 @@
 - [x] Add faster tiled/vector parcel serving for dense full-county views.
 - [x] Add structured API request logging.
 - [x] Add deployment environment variable documentation.
-- [ ] Add data-source refresh schedule.
+- [x] Add data-source refresh schedule.
 
 ## Live deployment status
 

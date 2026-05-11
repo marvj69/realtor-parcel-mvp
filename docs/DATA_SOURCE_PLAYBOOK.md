@@ -45,6 +45,14 @@ Import date
 Known limitations
 ```
 
+## Refresh schedule
+
+Each production source should follow the cadence in
+[DATA_REFRESH_SCHEDULE.md](DATA_REFRESH_SCHEDULE.md). Keep refresh metadata in
+`config/county-sources.local.json`, including the intended cadence, the last
+review date, and any source terms or schema notes. Refreshes are manual until
+import-job logging exists.
+
 ## Field normalization
 
 Every county may use different attribute names.

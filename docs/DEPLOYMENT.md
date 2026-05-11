@@ -38,6 +38,8 @@ Only variables prefixed with `NEXT_PUBLIC_` are sent to the browser. Database an
 2. Enable PostGIS by running `db/schema.sql` or `npm run db:schema`.
 3. Use pooled connection string for Vercel runtime.
 4. Keep direct connection string private for local import scripts if needed.
+5. Follow [DATA_REFRESH_SCHEDULE.md](DATA_REFRESH_SCHEDULE.md) for manual source
+   review and refresh cadence before enabling any automated import job.
 
 ## Database migration
 

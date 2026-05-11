@@ -17,6 +17,9 @@ type CountySource = {
   sourceUrl?: string;
   sourceUpdatedAt?: string;
   inputFile: string;
+  refreshCadence?: string;
+  lastRefreshReviewedAt?: string | null;
+  refreshNotes?: string;
   notes?: string;
   fieldMap: FieldMap;
 };
