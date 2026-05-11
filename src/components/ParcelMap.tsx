@@ -105,7 +105,6 @@ export default function ParcelMap() {
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("");
-  const [signupWorkspacePassword, setSignupWorkspacePassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -438,8 +437,7 @@ export default function ParcelMap() {
         body: JSON.stringify({
           email: signupEmail.trim(),
           displayName: signupName.trim() || undefined,
-          password: signupPassword,
-          workspacePassword: signupWorkspacePassword
+          password: signupPassword
         })
       });
       const payload = (await response.json()) as AuthPayload;
@@ -450,7 +448,6 @@ export default function ParcelMap() {
       setAuthData(payload.data);
       setSignupPassword("");
       setSignupPasswordConfirm("");
-      setSignupWorkspacePassword("");
       setAuthPassword("");
     } catch (err) {
       setAuthError(err instanceof Error ? err.message : "Unable to create account");
@@ -572,8 +569,7 @@ export default function ParcelMap() {
     const signupDisabled =
       !signupEmail.trim() ||
       signupPassword.length < 8 ||
-      signupPassword !== signupPasswordConfirm ||
-      !signupWorkspacePassword;
+      signupPassword !== signupPasswordConfirm;
 
     return (
       <div className="map-layout">
@@ -624,7 +620,7 @@ export default function ParcelMap() {
           ) : (
             <>
               <h2>Create an account</h2>
-              <p>Use the workspace password once to set up your own login.</p>
+              <p>Use your email and a password to set up your own login.</p>
               <form className="form-stack" onSubmit={createAccount}>
                 <label>
                   Name
@@ -659,15 +655,6 @@ export default function ParcelMap() {
                     onChange={(event) => setSignupPasswordConfirm(event.target.value)}
                     type="password"
                     autoComplete="new-password"
-                  />
-                </label>
-                <label>
-                  Workspace password
-                  <input
-                    value={signupWorkspacePassword}
-                    onChange={(event) => setSignupWorkspacePassword(event.target.value)}
-                    type="password"
-                    autoComplete="one-time-code"
                   />
                 </label>
                 <button className="primary-button" disabled={signupDisabled}>

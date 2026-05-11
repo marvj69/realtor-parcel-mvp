@@ -7,8 +7,7 @@ import {
   createSessionToken,
   isPrivateAuthEnabled,
   sessionCookieOptions,
-  toPublicUser,
-  verifyPrivateAppPassword
+  toPublicUser
 } from "@/lib/auth";
 import { hasDatabaseConfig } from "@/lib/env";
 
@@ -17,8 +16,7 @@ export const runtime = "nodejs";
 const registerSchema = z.object({
   email: z.string().trim().email().max(254),
   displayName: z.string().trim().max(120).optional(),
-  password: z.string().min(8).max(200),
-  workspacePassword: z.string().min(1).max(500)
+  password: z.string().min(8).max(200)
 });
 
 async function registerAccount(request: Request) {
@@ -31,7 +29,7 @@ async function registerAccount(request: Request) {
 
   if (!isPrivateAuthEnabled()) {
     return NextResponse.json(
-      { ok: false, error: "Account creation requires the private workspace password to be configured." },
+      { ok: false, error: "Account creation requires private app authentication to be enabled." },
       { status: 403 }
     );
   }
@@ -43,10 +41,7 @@ async function registerAccount(request: Request) {
     return NextResponse.json({ ok: false, error: "Enter a valid email and a password with at least 8 characters." }, { status: 400 });
   }
 
-  const { email, displayName, password, workspacePassword } = parsed.data;
-  if (!verifyPrivateAppPassword(workspacePassword)) {
-    return NextResponse.json({ ok: false, error: "Invalid workspace password" }, { status: 401 });
-  }
+  const { email, displayName, password } = parsed.data;
 
   try {
     const user = await createPasswordAccount({ email, displayName, password });

@@ -19,7 +19,7 @@
 | `PARCEL_BBOX_LIMIT` | Yes | Vercel + local `.env.local` | Server-side cap for bbox parcel results. |
 | `API_RATE_LIMIT_PER_MINUTE` | Optional | Vercel + local `.env.local` | Default per-route in-memory rate-limit fallback. Route-specific limits live in `src/lib/api-guard.ts`. |
 | `API_RATE_LIMIT_DISABLED` | Optional | Local only | Set to `true` only for local debugging. Keep `false` in production. |
-| `APP_AUTH_PASSWORD` | Recommended for production | Vercel + private local `.env.local` | Enables private-app password auth and acts as the workspace invite password for account creation. Leave empty only for local/demo open mode. Never use a `NEXT_PUBLIC_` prefix. |
+| `APP_AUTH_PASSWORD` | Recommended for production | Vercel + private local `.env.local` | Enables private-app password auth for the legacy shared sign-in path. Account creation does not require this password. Leave empty only for local/demo open mode. Never use a `NEXT_PUBLIC_` prefix. |
 | `APP_AUTH_SESSION_SECRET` | Recommended for production | Vercel + private local `.env.local` | Secret used to sign HTTP-only session cookies. Use a long random value. |
 | `APP_AUTH_USERNAME` | Optional | Vercel + private local `.env.local` | Optional username gate for the legacy shared-password sign-in path. Email/password accounts sign in with their email. |
 | `APP_AUTH_USER_ID` | Optional | Vercel + private local `.env.local` | Stable owner key for saved projects/parcels. Defaults to `private-app-user`. Do not change after saving data unless you intentionally want a new owner scope. |

@@ -85,8 +85,7 @@ For Vercel, use the pooled Neon connection string for runtime usage. If you add 
 Optional private-app auth is controlled by server-only env vars. Set `APP_AUTH_PASSWORD` and
 `APP_AUTH_SESSION_SECRET` in Vercel to require a signed session cookie for saved projects/parcels.
 Leave `APP_AUTH_PASSWORD` empty for local/demo open mode. When a Neon database is configured,
-users can create their own email/password account by entering the shared `APP_AUTH_PASSWORD` once
-as the workspace password.
+users can create their own email/password account without a shared workspace password.
 
 ### 3. Create database schema
 
