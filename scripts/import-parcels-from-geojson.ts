@@ -15,6 +15,7 @@ type CountySource = {
   state?: string;
   sourceType?: string;
   sourceUrl?: string;
+  sourceUpdatedAt?: string;
   inputFile: string;
   notes?: string;
   fieldMap: FieldMap;
@@ -102,8 +103,8 @@ async function main() {
 
     await client.query(
       `
-      INSERT INTO parcel_sources (source_key, provider, county, state, source_url, source_type, notes, raw_config, imported_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, now())
+      INSERT INTO parcel_sources (source_key, provider, county, state, source_url, source_type, source_updated_at, notes, raw_config, imported_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8, $9::jsonb, now())
       ON CONFLICT (source_key)
       DO UPDATE SET
         provider = EXCLUDED.provider,
@@ -111,6 +112,7 @@ async function main() {
         state = EXCLUDED.state,
         source_url = EXCLUDED.source_url,
         source_type = EXCLUDED.source_type,
+        source_updated_at = EXCLUDED.source_updated_at,
         notes = EXCLUDED.notes,
         raw_config = EXCLUDED.raw_config,
         imported_at = now()
@@ -122,6 +124,7 @@ async function main() {
         source.state ?? null,
         source.sourceUrl ?? null,
         source.sourceType ?? null,
+        source.sourceUpdatedAt ?? null,
         source.notes ?? null,
         JSON.stringify(source)
       ]

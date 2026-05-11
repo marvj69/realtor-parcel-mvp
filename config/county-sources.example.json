@@ -6,6 +6,7 @@
     "state": "MI",
     "sourceType": "arcgis_feature_server",
     "sourceUrl": "REPLACE_WITH_VALID_ARCGIS_FEATURESERVER_LAYER_QUERY_URL_OR_LAYER_URL",
+    "sourceUpdatedAt": null,
     "inputFile": "data/parcels/houghton-mi-example.geojson",
     "notes": "Replace URL and field names after validating the actual public GIS source.",
     "fieldMap": {
