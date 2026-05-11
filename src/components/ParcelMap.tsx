@@ -23,7 +23,9 @@ const PARCEL_TILE_SOURCE_ID = "parcel-tiles";
 const PARCEL_TILE_SOURCE_LAYER = "parcels";
 const SATELLITE_SOURCE_ID = "usgs-satellite";
 const SATELLITE_LAYER_ID = "usgs-satellite-layer";
+const PARCEL_TILE_FILL_LAYER_ID = "parcel-tile-fill";
 const PARCEL_TILE_LINE_LAYER_ID = "parcel-tile-line";
+const PARCEL_GEOJSON_FILL_LAYER_ID = "parcel-fill";
 const PARCEL_GEOJSON_LINE_LAYER_ID = "parcel-line";
 const SELECTED_PARCEL_LINE_LAYER_ID = "selected-parcel-line";
 const MEASUREMENT_SOURCE_ID = "measurements";
@@ -107,6 +109,15 @@ function setGeoJsonSourceData(
 ) {
   const source = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
   if (source) source.setData(data);
+}
+
+function hasSelectableParcelAtPoint(map: maplibregl.Map, point: maplibregl.PointLike) {
+  const parcelLayerIds = [PARCEL_TILE_FILL_LAYER_ID, PARCEL_GEOJSON_FILL_LAYER_ID].filter((layerId) =>
+    Boolean(map.getLayer(layerId))
+  );
+
+  if (parcelLayerIds.length === 0) return false;
+  return map.queryRenderedFeatures(point, { layers: parcelLayerIds }).length > 0;
 }
 
 function setMeasurementSourceData(
@@ -477,7 +488,7 @@ export default function ParcelMap() {
     }
 
     function setParcelGeoJsonLayerVisibility(visible: boolean) {
-      for (const layerId of ["parcel-fill", "parcel-line"]) {
+      for (const layerId of [PARCEL_GEOJSON_FILL_LAYER_ID, PARCEL_GEOJSON_LINE_LAYER_ID]) {
         if (map.getLayer(layerId)) {
           map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
         }
@@ -615,7 +626,7 @@ export default function ParcelMap() {
         });
 
         map.addLayer({
-          id: "parcel-tile-fill",
+          id: PARCEL_TILE_FILL_LAYER_ID,
           type: "fill",
           source: PARCEL_TILE_SOURCE_ID,
           "source-layer": PARCEL_TILE_SOURCE_LAYER,
@@ -662,7 +673,7 @@ export default function ParcelMap() {
       });
 
       map.addLayer({
-        id: "parcel-fill",
+        id: PARCEL_GEOJSON_FILL_LAYER_ID,
         type: "fill",
         source: "parcels",
         layout: {
@@ -762,6 +773,17 @@ export default function ParcelMap() {
         addMeasurementPoint(event.lngLat.lng, event.lngLat.lat);
         return;
       }
+
+      if (map.getZoom() < parcelLayerConfig.minZoom) {
+        setStatusMessage("Zoom in until parcel outlines are visible before selecting a parcel.");
+        return;
+      }
+
+      if (!hasSelectableParcelAtPoint(map, event.point)) {
+        setStatusMessage("Click a visible parcel outline to select it.");
+        return;
+      }
+
       await selectParcelAt(event.lngLat.lng, event.lngLat.lat);
     });
 
