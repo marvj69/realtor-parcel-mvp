@@ -12,6 +12,9 @@ const EMPTY_FEATURE_COLLECTION: FeatureCollection<Polygon | MultiPolygon, Parcel
   features: []
 };
 
+const PARCEL_TILE_SOURCE_ID = "parcel-tiles";
+const PARCEL_TILE_SOURCE_LAYER = "parcels";
+
 function getMapConfig() {
   const centerRaw = process.env.NEXT_PUBLIC_DEFAULT_CENTER ?? "-88.5690,47.1211";
   const [lngRaw, latRaw] = centerRaw.split(",");
@@ -22,6 +25,13 @@ function getMapConfig() {
     styleUrl: process.env.NEXT_PUBLIC_MAP_STYLE_URL ?? "https://tiles.openfreemap.org/styles/liberty",
     center: [Number.isFinite(lng) ? lng : -88.569, Number.isFinite(lat) ? lat : 47.1211] as [number, number],
     zoom: Number(process.env.NEXT_PUBLIC_DEFAULT_ZOOM ?? 13)
+  };
+}
+
+function getParcelLayerConfig() {
+  return {
+    minZoom: Number(process.env.NEXT_PUBLIC_PARCEL_MIN_ZOOM ?? 13),
+    vectorTilesEnabled: process.env.NEXT_PUBLIC_PARCEL_VECTOR_TILES !== "false"
   };
 }
 
@@ -43,12 +53,27 @@ type BboxPayload = {
   message?: string;
   tooMany?: boolean;
   shouldLoad?: boolean;
+  demo?: boolean;
   error?: string;
 };
 
 type SearchPayload = {
   ok?: boolean;
   data?: ParcelSearchResult[];
+  error?: string;
+};
+
+type AuthPayload = {
+  ok?: boolean;
+  data?: {
+    authEnabled: boolean;
+    authenticated: boolean;
+    user: {
+      id: string;
+      email: string | null;
+      displayName: string | null;
+    } | null;
+  };
   error?: string;
 };
 
@@ -68,8 +93,43 @@ export default function ParcelMap() {
   const [searchResults, setSearchResults] = useState<ParcelSearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authData, setAuthData] = useState<AuthPayload["data"] | null>(null);
+  const [authUsername, setAuthUsername] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadSession() {
+      setAuthLoading(true);
+      setAuthError(null);
+
+      try {
+        const response = await fetch("/api/auth/session", {
+          signal: controller.signal,
+          cache: "no-store"
+        });
+        const payload = (await response.json()) as AuthPayload;
+        if (!response.ok || !payload.ok || !payload.data) {
+          throw new Error(payload.error ?? "Unable to check app access");
+        }
+        setAuthData(payload.data);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setAuthError(err instanceof Error ? err.message : "Unable to check app access");
+      } finally {
+        if (!controller.signal.aborted) setAuthLoading(false);
+      }
+    }
+
+    void loadSession();
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    if (authLoading || !authData?.authenticated) return;
     if (!mapContainerRef.current || mapRef.current) return;
 
     const config = getMapConfig();
@@ -83,6 +143,7 @@ export default function ParcelMap() {
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
     mapRef.current = map;
+    const parcelLayerConfig = getParcelLayerConfig();
 
     function clearParcels(message: string) {
       setGeoJsonSourceData(map, "parcels", EMPTY_FEATURE_COLLECTION);
@@ -91,10 +152,18 @@ export default function ParcelMap() {
       setStatusMessage(message);
     }
 
+    function setParcelGeoJsonLayerVisibility(visible: boolean) {
+      for (const layerId of ["parcel-fill", "parcel-line"]) {
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+        }
+      }
+    }
+
     async function loadVisibleParcels() {
       if (!mapRef.current) return;
       const zoom = mapRef.current.getZoom();
-      const minZoom = Number(process.env.NEXT_PUBLIC_PARCEL_MIN_ZOOM ?? 13);
+      const minZoom = parcelLayerConfig.minZoom;
 
       if (zoom < minZoom) {
         parcelAbortRef.current?.abort();
@@ -108,7 +177,8 @@ export default function ParcelMap() {
         south: String(bounds.getSouth()),
         east: String(bounds.getEast()),
         north: String(bounds.getNorth()),
-        zoom: String(zoom)
+        zoom: String(zoom),
+        metadataOnly: parcelLayerConfig.vectorTilesEnabled ? "1" : "0"
       });
 
       parcelAbortRef.current?.abort();
@@ -126,12 +196,16 @@ export default function ParcelMap() {
         }
 
         const data = payload.data ?? EMPTY_FEATURE_COLLECTION;
-        setGeoJsonSourceData(mapRef.current, "parcels", data);
-        setVisibleCount(data.features.length);
+        const shouldShowGeoJsonParcels = !parcelLayerConfig.vectorTilesEnabled || Boolean(payload.demo);
+        setParcelGeoJsonLayerVisibility(shouldShowGeoJsonParcels);
+        setGeoJsonSourceData(mapRef.current, "parcels", shouldShowGeoJsonParcels ? data : EMPTY_FEATURE_COLLECTION);
+        setVisibleCount(shouldShowGeoJsonParcels ? data.features.length : (payload.count ?? 0));
         setTotalInView(payload.count ?? data.features.length);
         setStatusMessage(
           payload.message ??
-            `${data.features.length.toLocaleString()} parcel outline${data.features.length === 1 ? "" : "s"} loaded.`
+            (parcelLayerConfig.vectorTilesEnabled
+              ? "Parcel vector tiles active. Click a parcel for full details."
+              : `${data.features.length.toLocaleString()} parcel outline${data.features.length === 1 ? "" : "s"} loaded.`)
         );
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -186,6 +260,64 @@ export default function ParcelMap() {
         data: EMPTY_FEATURE_COLLECTION
       });
 
+      if (parcelLayerConfig.vectorTilesEnabled) {
+        map.addSource(PARCEL_TILE_SOURCE_ID, {
+          type: "vector",
+          tiles: [`${window.location.origin}/api/parcels/tiles/{z}/{x}/{y}`],
+          minzoom: parcelLayerConfig.minZoom,
+          maxzoom: 22
+        });
+
+        map.addLayer({
+          id: "parcel-tile-fill",
+          type: "fill",
+          source: PARCEL_TILE_SOURCE_ID,
+          "source-layer": PARCEL_TILE_SOURCE_LAYER,
+          minzoom: parcelLayerConfig.minZoom,
+          paint: {
+            "fill-color": "#2563eb",
+            "fill-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              parcelLayerConfig.minZoom,
+              0.03,
+              16,
+              0.08
+            ]
+          }
+        });
+
+        map.addLayer({
+          id: "parcel-tile-line",
+          type: "line",
+          source: PARCEL_TILE_SOURCE_ID,
+          "source-layer": PARCEL_TILE_SOURCE_LAYER,
+          minzoom: parcelLayerConfig.minZoom,
+          paint: {
+            "line-color": "#1d4ed8",
+            "line-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              parcelLayerConfig.minZoom,
+              0.45,
+              16,
+              0.8
+            ],
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              parcelLayerConfig.minZoom,
+              0.55,
+              17,
+              1.25
+            ]
+          }
+        });
+      }
+
       map.addSource("selected-parcel", {
         type: "geojson",
         data: EMPTY_FEATURE_COLLECTION
@@ -195,6 +327,9 @@ export default function ParcelMap() {
         id: "parcel-fill",
         type: "fill",
         source: "parcels",
+        layout: {
+          visibility: parcelLayerConfig.vectorTilesEnabled ? "none" : "visible"
+        },
         paint: {
           "fill-color": "#2563eb",
           "fill-opacity": 0.08
@@ -205,6 +340,9 @@ export default function ParcelMap() {
         id: "parcel-line",
         type: "line",
         source: "parcels",
+        layout: {
+          visibility: parcelLayerConfig.vectorTilesEnabled ? "none" : "visible"
+        },
         paint: {
           "line-color": "#1d4ed8",
           "line-opacity": 0.65,
@@ -249,7 +387,46 @@ export default function ParcelMap() {
       map.remove();
       mapRef.current = null;
     };
-  }, []);
+  }, [authData?.authenticated, authLoading]);
+
+  async function login(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAuthError(null);
+
+    try {
+      const response = await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: authUsername.trim() || undefined,
+          password: authPassword
+        })
+      });
+      const payload = (await response.json()) as AuthPayload;
+      if (!response.ok || !payload.ok || !payload.data) {
+        throw new Error(payload.error ?? "Unable to sign in");
+      }
+      setAuthData(payload.data);
+      setAuthPassword("");
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : "Unable to sign in");
+    }
+  }
+
+  async function logout() {
+    await fetch("/api/auth/session", { method: "DELETE" }).catch(() => null);
+    setAuthData((current) =>
+      current
+        ? {
+            ...current,
+            authenticated: false,
+            user: null
+          }
+        : current
+    );
+    setSelectedParcel(null);
+    setSearchResults([]);
+  }
 
   async function runSearch(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -321,12 +498,75 @@ export default function ParcelMap() {
     }
   }
 
+  if (authLoading) {
+    return (
+      <div className="map-layout">
+        <section className="auth-panel">
+          <h2>Checking access…</h2>
+          <p>Loading your private parcel workspace.</p>
+        </section>
+      </div>
+    );
+  }
+
+  if (authError && !authData) {
+    return (
+      <div className="map-layout">
+        <section className="auth-panel">
+          <h2>Unable to check access</h2>
+          <p>{authError}</p>
+          <button className="primary-button" type="button" onClick={() => window.location.reload()}>
+            Retry
+          </button>
+        </section>
+      </div>
+    );
+  }
+
+  if (authData?.authEnabled && !authData.authenticated) {
+    return (
+      <div className="map-layout">
+        <section className="auth-panel">
+          <h2>Private parcel workspace</h2>
+          <p>Sign in to view Houghton County parcel data and saved projects.</p>
+          <form className="form-stack" onSubmit={login}>
+            <label>
+              Username
+              <input value={authUsername} onChange={(event) => setAuthUsername(event.target.value)} autoComplete="username" />
+            </label>
+            <label>
+              Password
+              <input
+                value={authPassword}
+                onChange={(event) => setAuthPassword(event.target.value)}
+                type="password"
+                autoComplete="current-password"
+              />
+            </label>
+            <button className="primary-button" disabled={!authPassword}>
+              Sign in
+            </button>
+            {authError ? <p className="message error">{authError}</p> : null}
+          </form>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="map-layout">
       <div className="map-wrap">
         <div className="map-status">
           <strong>{loading ? "Loading parcels…" : "Parcel layer"}</strong>
           <p>{statusMessage}</p>
+          {authData?.authEnabled && authData.authenticated ? (
+            <div className="session-row">
+              <span>{authData.user?.displayName ?? authData.user?.id ?? "Signed in"}</span>
+              <button className="text-button" type="button" onClick={logout}>
+                Sign out
+              </button>
+            </div>
+          ) : null}
         </div>
         <div ref={mapContainerRef} className="map-canvas" />
         <Disclaimer />
@@ -345,6 +585,7 @@ export default function ParcelMap() {
         searchLoading={searchLoading}
         searchError={searchError}
         onSearchResultClick={selectSearchResult}
+        onSavedParcelClick={selectSearchResult}
       />
     </div>
   );

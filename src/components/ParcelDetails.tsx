@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import SavedProjectsSidebar from "@/components/SavedProjectsSidebar";
 import type { ParcelFeature, ParcelSearchResult } from "@/types/parcel";
 
 type Props = {
@@ -17,6 +18,7 @@ type Props = {
   searchLoading: boolean;
   searchError: string | null;
   onSearchResultClick: (result: ParcelSearchResult) => void;
+  onSavedParcelClick: (result: ParcelSearchResult) => void;
 };
 
 function fmt(value: unknown) {
@@ -37,6 +39,25 @@ function date(value: string | null | undefined) {
   return parsed.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
+function matchKindLabel(kind: ParcelSearchResult["matchKind"]) {
+  switch (kind) {
+    case "parcel_id":
+      return "Parcel ID";
+    case "apn":
+      return "APN";
+    case "owner_name":
+      return "Owner";
+    case "site_address":
+      return "Site address";
+    case "mailing_address":
+      return "Mailing address";
+    case "land_use":
+      return "Land use";
+    default:
+      return "Match";
+  }
+}
+
 export default function ParcelDetails({
   parcel,
   visibleCount,
@@ -50,7 +71,8 @@ export default function ParcelDetails({
   searchResults,
   searchLoading,
   searchError,
-  onSearchResultClick
+  onSearchResultClick,
+  onSavedParcelClick
 }: Props) {
   const [projectName, setProjectName] = useState("Houghton Project");
   const [tag, setTag] = useState("showing");
@@ -58,6 +80,22 @@ export default function ParcelDetails({
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [projectRefreshKey, setProjectRefreshKey] = useState(0);
+  const latestSearchSubmitRef = useRef(onSearchSubmit);
+
+  useEffect(() => {
+    latestSearchSubmitRef.current = onSearchSubmit;
+  }, [onSearchSubmit]);
+
+  useEffect(() => {
+    if (searchQuery.trim().length < 3) return;
+
+    const timeout = setTimeout(() => {
+      void latestSearchSubmitRef.current();
+    }, 320);
+
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
 
   async function saveParcel() {
     if (!parcel) return;
@@ -84,6 +122,7 @@ export default function ParcelDetails({
 
       setSaveMessage(payload.data?.persisted === false ? "Demo save accepted. Configure DATABASE_URL to persist projects." : "Parcel saved to project.");
       setNote("");
+      setProjectRefreshKey((value) => value + 1);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Unable to save parcel");
     } finally {
@@ -122,6 +161,9 @@ export default function ParcelDetails({
                 disabled={!result.center}
               >
                 <span className="result-title">{fmt(result.siteAddress) !== "—" ? fmt(result.siteAddress) : fmt(result.parcelId)}</span>
+                <span>
+                  {matchKindLabel(result.matchKind)}: {fmt(result.matchLabel)}
+                </span>
                 <span>{fmt(result.ownerName)}</span>
                 <span>
                   {fmt(result.apn)} · {fmt(result.acreage)} ac
@@ -131,6 +173,13 @@ export default function ParcelDetails({
           </div>
         ) : null}
       </section>
+
+      <SavedProjectsSidebar
+        refreshKey={projectRefreshKey}
+        activeParcelId={parcel?.properties.id ?? null}
+        onProjectNameSelect={setProjectName}
+        onSavedParcelSelect={onSavedParcelClick}
+      />
 
       <section className="panel-section">
         <h2>Parcel lookup</h2>

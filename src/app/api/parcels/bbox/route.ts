@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { apiRateLimits, withApiGuard } from "@/lib/api-guard";
 import { query } from "@/lib/db";
 import { getNumberEnv, hasDatabaseConfig } from "@/lib/env";
 import { getDemoParcelCollection } from "@/lib/demo-parcels";
@@ -76,7 +77,7 @@ function getPolicy(zoom: number): BboxPolicy {
   return { limit: Math.min(envLimit, 2000), tolerance: 0.000005, simplified: true };
 }
 
-export async function GET(request: Request) {
+async function getParcelBbox(request: Request) {
   const url = new URL(request.url);
   const parsed = getBbox(url);
   if (!parsed.success) {
@@ -85,6 +86,7 @@ export async function GET(request: Request) {
 
   const zoomParsed = zoomSchema.safeParse(url.searchParams.get("zoom") ?? undefined);
   const zoom = zoomParsed.success ? zoomParsed.data : 0;
+  const metadataOnly = url.searchParams.get("metadataOnly") === "1";
   const [minLng, minLat, maxLng, maxLat] = parsed.data;
   const policy = getPolicy(zoom);
 
@@ -125,6 +127,21 @@ export async function GET(request: Request) {
       [minLng, minLat, maxLng, maxLat]
     );
     const count = Number(countRows[0]?.count ?? 0);
+
+    if (metadataOnly) {
+      return NextResponse.json({
+        ok: true,
+        data: { type: "FeatureCollection", features: [] },
+        count,
+        limit: policy.limit,
+        minZoom: MIN_PARCEL_ZOOM,
+        zoom,
+        shouldLoad: true,
+        simplified: policy.simplified,
+        vectorTiles: true,
+        message: `${count.toLocaleString()} parcels available as vector tiles. Click a parcel for full details.`
+      });
+    }
 
     if (count > policy.limit) {
       return NextResponse.json({
@@ -192,3 +209,8 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const GET = withApiGuard(getParcelBbox, {
+  route: "GET /api/parcels/bbox",
+  rateLimit: apiRateLimits.bbox
+});

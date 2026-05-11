@@ -82,6 +82,10 @@ DATABASE_URL="postgresql://..."
 
 For Vercel, use the pooled Neon connection string for runtime usage. If you add `DATABASE_DIRECT_URL`, use it only for scripts/migrations.
 
+Optional private-app auth is controlled by server-only env vars. Set `APP_AUTH_PASSWORD` and
+`APP_AUTH_SESSION_SECRET` in Vercel to require a signed session cookie for saved projects/parcels.
+Leave `APP_AUTH_PASSWORD` empty for local/demo open mode.
+
 ### 3. Create database schema
 
 ```bash

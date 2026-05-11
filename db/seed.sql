@@ -1,5 +1,9 @@
 BEGIN;
 
+INSERT INTO app_users (id, display_name, auth_provider)
+VALUES ('private-app-user', 'Private app user', 'private_env')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO parcel_sources (
   source_key,
   provider,
@@ -70,8 +74,14 @@ ON CONFLICT (source_key, source_feature_id) DO UPDATE SET
   raw = EXCLUDED.raw,
   geom = EXCLUDED.geom;
 
-INSERT INTO projects (user_label, name, client_name, description)
-VALUES ('default', 'Demo Project', 'Demo Client', 'Default project for testing saved parcels.')
-ON CONFLICT (user_label, name) DO NOTHING;
+INSERT INTO projects (owner_user_id, user_label, name, client_name, description)
+VALUES (
+  'private-app-user',
+  'private-app-user',
+  'Demo Project',
+  'Demo Client',
+  'Default project for testing saved parcels.'
+)
+ON CONFLICT (owner_user_id, name) DO NOTHING;
 
 COMMIT;

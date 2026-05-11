@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { apiRateLimits, withApiGuard } from "@/lib/api-guard";
 import { query } from "@/lib/db";
 import { hasDatabaseConfig } from "@/lib/env";
 import { getDemoParcelByPoint } from "@/lib/demo-parcels";
@@ -13,7 +14,7 @@ const coordinateSchema = z.object({
   lng: z.coerce.number().min(-180).max(180)
 });
 
-export async function GET(request: Request) {
+async function lookupParcel(request: Request) {
   const url = new URL(request.url);
   const parsed = coordinateSchema.safeParse({
     lat: url.searchParams.get("lat"),
@@ -75,3 +76,8 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const GET = withApiGuard(lookupParcel, {
+  route: "GET /api/parcels/lookup",
+  rateLimit: apiRateLimits.lookup
+});

@@ -21,6 +21,7 @@
     "pg": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "server-only": "^0.0.1",
     "zod": "latest"
   },
   "devDependencies": {

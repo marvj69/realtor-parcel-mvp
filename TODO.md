@@ -25,6 +25,11 @@
 - [x] Add APN/owner/site-address/mailing-address search panel UI.
 - [x] Add Postgres trigram indexes for parcel search fields.
 - [x] Verify local dense-view, search, click lookup, and save API smoke tests.
+- [x] Add saved-project sidebar/list UI with saved parcel notes.
+- [x] Add private-app sign-in/sign-out UI backed by server-only env vars.
+- [x] Add vector-tile parcel layer for dense Houghton views.
+- [x] Add API rate limiting and structured request logging.
+- [x] Improve search ranking/autocomplete with APN prefix boosts.
 
 ## Parcel map MVP
 
@@ -39,7 +44,7 @@
 - [x] Trigger private parcel note submission through `/api/saved-parcels`.
 - [x] Persist saved parcels and notes after Neon schema is applied.
 - [x] Add search by APN/site address/mailing address/owner.
-- [ ] Add project sidebar.
+- [x] Add project sidebar.
 
 ## Data ingestion
 
@@ -68,13 +73,13 @@
 
 ## Production
 
-- [ ] Add authentication.
-- [ ] Add per-user data ownership.
-- [ ] Add rate limiting.
+- [x] Add private-app password/session auth primitives.
+- [x] Add per-user ownership for projects and saved parcels.
+- [x] Add rate limiting.
 - [ ] Add import-job logging.
 - [x] Add geometry, source-key, APN/parcel-ID, owner, site-address, and mailing-address search indexes.
-- [ ] Add faster tiled/vector parcel serving for dense full-county views.
-- [ ] Add monitoring/error logging.
+- [x] Add faster tiled/vector parcel serving for dense full-county views.
+- [x] Add structured API request logging.
 - [x] Add deployment environment variable documentation.
 - [ ] Add data-source refresh schedule.
 
@@ -86,22 +91,24 @@
 - Neon/PostGIS is working in local and production API routes.
 - Production Neon currently contains `houghton-mi-2024` with 28,602 Houghton County parcels.
 - Latest Houghton performance/search pass adds zoom-aware loading, server-side simplification, hard bbox caps, and search UI.
+- Auth/ownership pass adds `/api/auth/session`, server-only private-app auth env vars, and owner-scoped saved projects/parcels.
+- Current development pass adds saved-project sidebar UI, MapLibre vector tiles, ranked/autocomplete search, and API hardening.
 - Demo fallback remains available when `DATABASE_URL` is missing or still a placeholder.
 
 ## Current blockers
 
-- [ ] No authentication or per-user data ownership yet, so production use should stay private/internal.
-- [ ] Project/sidebar workflow is still minimal; saved parcels persist through the API but are not listed in the UI yet.
-- [ ] Dense city-center parcel outlines intentionally require zooming farther in; vector tiles would be the next step for effortless full-city parcel rendering.
-- [ ] No API rate limiting or abuse protection yet.
+- [ ] Production Vercel still needs `APP_AUTH_PASSWORD` and `APP_AUTH_SESSION_SECRET` set before treating the live app as private.
+- [ ] Saved-project sidebar can list saved parcels and notes, but full project management/edit/delete screens are not built yet.
+- [ ] Vector tiles are live locally/API-smoked, but still need final production browser verification after deploy.
+- [ ] Rate limiting is in-memory per serverless instance; use durable Redis/Edge Config later if this becomes multi-user/high-traffic.
 
 ## Next recommended tasks
 
-- [ ] Add a saved-project sidebar that lists saved parcels and notes from Postgres.
-- [ ] Add authentication and per-user project ownership before inviting multiple real users.
-- [ ] Add vector-tile parcel serving or tile-cache strategy if full-city outlines need to render without zooming farther in.
-- [ ] Improve search ranking/autocomplete with APN prefix boosts and owner/address grouping.
-- [ ] Add rate limiting and structured API logging for production hardening.
+- [ ] Set production auth env vars in Vercel and verify unauthenticated live access is blocked.
+- [ ] Deploy this pass and verify live map tiles, search, sign-in, saved-project list, click lookup, and save flow.
+- [ ] Add project/saved-parcel edit/delete actions with owner-scoped API routes.
+- [ ] Add import-job logging before any automated data refresh work.
+- [ ] Add a printable parcel brief/export view for selected and saved parcels.
 
 ## Later
 

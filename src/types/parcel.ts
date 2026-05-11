@@ -26,6 +26,41 @@ export type ParcelFeatureCollection = FeatureCollection<Polygon | MultiPolygon, 
 
 export type ParcelSearchResult = ParcelProperties & {
   center: Point | null;
+  matchKind?: "parcel_id" | "apn" | "owner_name" | "site_address" | "mailing_address" | "land_use" | null;
+  matchLabel?: string | null;
+  rank?: number | null;
+};
+
+export type SavedParcelNote = {
+  id: string;
+  note: string;
+  createdAt: string | null;
+};
+
+export type SavedParcelSummary = {
+  id: string;
+  projectId: string;
+  label: string | null;
+  tag: string | null;
+  createdAt: string | null;
+  parcel: ParcelProperties;
+  center: Point | null;
+  notes: SavedParcelNote[];
+};
+
+export type SavedProjectSummary = {
+  id: string;
+  name: string;
+  clientName: string | null;
+  description: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  savedParcelCount: number;
+  savedParcels: SavedParcelSummary[];
+};
+
+export type ProjectsResponseData = {
+  projects: SavedProjectSummary[];
 };
 
 export type ParcelRow = {
