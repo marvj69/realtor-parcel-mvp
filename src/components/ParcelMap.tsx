@@ -2,12 +2,19 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import maplibregl from "maplibre-gl";
-import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
+import { area as turfArea, length as turfLength, lineString as turfLineString, polygon as turfPolygon } from "@turf/turf";
+import type { Feature, FeatureCollection, Geometry, MultiPolygon, Polygon, Position } from "geojson";
 import Disclaimer from "@/components/Disclaimer";
 import ParcelDetails from "@/components/ParcelDetails";
+import type { AppPanel, MeasurementMode, MeasurementPoint, MeasurementSummary } from "@/types/measurement";
 import type { ParcelFeature, ParcelProperties, ParcelSearchResult } from "@/types/parcel";
 
 const EMPTY_FEATURE_COLLECTION: FeatureCollection<Polygon | MultiPolygon, ParcelProperties> = {
+  type: "FeatureCollection",
+  features: []
+};
+
+const EMPTY_MEASUREMENT_COLLECTION: FeatureCollection<Geometry, MeasurementFeatureProperties> = {
   type: "FeatureCollection",
   features: []
 };
@@ -19,10 +26,19 @@ const SATELLITE_LAYER_ID = "usgs-satellite-layer";
 const PARCEL_TILE_LINE_LAYER_ID = "parcel-tile-line";
 const PARCEL_GEOJSON_LINE_LAYER_ID = "parcel-line";
 const SELECTED_PARCEL_LINE_LAYER_ID = "selected-parcel-line";
+const MEASUREMENT_SOURCE_ID = "measurements";
+const MEASUREMENT_FILL_LAYER_ID = "measurement-fill";
+const MEASUREMENT_LINE_LAYER_ID = "measurement-line";
+const MEASUREMENT_POINT_LAYER_ID = "measurement-points";
 const STREET_PARCEL_LINE_COLOR = "#1d4ed8";
 const SATELLITE_PARCEL_LINE_COLOR = "#ff7a00";
 const STREET_SELECTED_PARCEL_LINE_COLOR = "#ea580c";
 const SATELLITE_SELECTED_PARCEL_LINE_COLOR = "#ff9f1c";
+
+type MeasurementFeatureProperties = {
+  kind: "line" | "shape" | "point";
+  label?: string;
+};
 
 type BasemapMode = "streets" | "satellite";
 type NumberInterpolateExpression = ["interpolate", ["linear"], ["zoom"], number, number, number, number];
@@ -89,6 +105,144 @@ function setGeoJsonSourceData(
   if (source) source.setData(data);
 }
 
+function setMeasurementSourceData(
+  map: maplibregl.Map,
+  data: FeatureCollection<Geometry, MeasurementFeatureProperties>
+) {
+  const source = map.getSource(MEASUREMENT_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
+  if (source) source.setData(data);
+}
+
+function pointPosition(point: MeasurementPoint): Position {
+  return [point.lng, point.lat];
+}
+
+function getRectangleRing(points: MeasurementPoint[]): Position[] {
+  if (points.length < 2) return [];
+  const [start, end] = points;
+  return [
+    [start.lng, start.lat],
+    [end.lng, start.lat],
+    [end.lng, end.lat],
+    [start.lng, end.lat],
+    [start.lng, start.lat]
+  ];
+}
+
+function getMeasurementRing(mode: MeasurementMode, points: MeasurementPoint[]): Position[] {
+  if (mode === "rectangle") return getRectangleRing(points);
+  if (mode !== "area" || points.length < 3) return [];
+  return [...points.map(pointPosition), pointPosition(points[0])];
+}
+
+function buildMeasurementCollection(
+  mode: MeasurementMode,
+  points: MeasurementPoint[]
+): FeatureCollection<Geometry, MeasurementFeatureProperties> {
+  if (points.length === 0) return EMPTY_MEASUREMENT_COLLECTION;
+
+  const features: Feature<Geometry, MeasurementFeatureProperties>[] = points.map((measurementPoint, index) => ({
+    type: "Feature",
+    geometry: {
+      type: "Point",
+      coordinates: pointPosition(measurementPoint)
+    },
+    properties: {
+      kind: "point",
+      label: String(index + 1)
+    }
+  }));
+
+  const ring = getMeasurementRing(mode, points);
+  if (ring.length > 0) {
+    features.unshift({
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        coordinates: [ring]
+      },
+      properties: {
+        kind: "shape"
+      }
+    });
+  } else if (points.length > 1) {
+    features.unshift({
+      type: "Feature",
+      geometry: {
+        type: "LineString",
+        coordinates: points.map(pointPosition)
+      },
+      properties: {
+        kind: "line"
+      }
+    });
+  }
+
+  return {
+    type: "FeatureCollection",
+    features
+  };
+}
+
+function formatDistance(miles: number) {
+  if (!Number.isFinite(miles) || miles <= 0) return "0 ft";
+  if (miles < 0.2) return `${Math.round(miles * 5280).toLocaleString()} ft`;
+  return `${miles.toLocaleString(undefined, { maximumFractionDigits: 2 })} mi`;
+}
+
+function formatArea(squareMeters: number) {
+  if (!Number.isFinite(squareMeters) || squareMeters <= 0) return "0 sq ft";
+  const squareFeet = squareMeters * 10.7639;
+  const acres = squareMeters * 0.000247105;
+  return `${acres.toLocaleString(undefined, { maximumFractionDigits: 2 })} ac (${Math.round(squareFeet).toLocaleString()} sq ft)`;
+}
+
+function getLineDistance(points: MeasurementPoint[]) {
+  if (points.length < 2) return 0;
+  return turfLength(turfLineString(points.map(pointPosition)), { units: "miles" });
+}
+
+function getRingPerimeter(ring: Position[]) {
+  if (ring.length < 4) return 0;
+  return turfLength(turfLineString(ring), { units: "miles" });
+}
+
+function getMeasurementSummary(mode: MeasurementMode, points: MeasurementPoint[]): MeasurementSummary {
+  if (mode === "distance") {
+    const distance = getLineDistance(points);
+    return {
+      title: "Distance",
+      primary: points.length > 1 ? formatDistance(distance) : "No distance yet",
+      secondary: `${points.length.toLocaleString()} point${points.length === 1 ? "" : "s"}`,
+      hint: points.length === 0 ? "Tap the map to add the first point." : "Tap the map to extend the route."
+    };
+  }
+
+  const ring = getMeasurementRing(mode, points);
+  const neededPoints = mode === "rectangle" ? 2 : 3;
+
+  if (ring.length === 0) {
+    const remaining = Math.max(neededPoints - points.length, 0);
+    return {
+      title: mode === "rectangle" ? "Area box" : "Area",
+      primary: "No area yet",
+      secondary: `${points.length.toLocaleString()} point${points.length === 1 ? "" : "s"}`,
+      hint:
+        remaining > 0
+          ? `Add ${remaining.toLocaleString()} more point${remaining === 1 ? "" : "s"} to calculate area.`
+          : "Tap the map to add points."
+    };
+  }
+
+  const area = turfArea(turfPolygon([ring]));
+  return {
+    title: mode === "rectangle" ? "Area box" : "Area",
+    primary: formatArea(area),
+    secondary: `Perimeter ${formatDistance(getRingPerimeter(ring))}`,
+    hint: mode === "rectangle" ? "Click a new corner to start another box." : "Tap the map to add another corner."
+  };
+}
+
 type BboxPayload = {
   ok?: boolean;
   data?: FeatureCollection<Polygon | MultiPolygon, ParcelProperties>;
@@ -132,8 +286,13 @@ export default function ParcelMap() {
   const parcelDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
   const basemapModeRef = useRef<BasemapMode>("streets");
+  const activePanelRef = useRef<AppPanel>("map");
+  const measurementModeRef = useRef<MeasurementMode>("distance");
   const [selectedParcel, setSelectedParcel] = useState<ParcelFeature | null>(null);
+  const [activePanel, setActivePanel] = useState<AppPanel>("map");
   const [basemapMode, setBasemapMode] = useState<BasemapMode>("streets");
+  const [measurementMode, setMeasurementMode] = useState<MeasurementMode>("distance");
+  const [measurementPoints, setMeasurementPoints] = useState<MeasurementPoint[]>([]);
   const [visibleCount, setVisibleCount] = useState(0);
   const [totalInView, setTotalInView] = useState(0);
   const [statusMessage, setStatusMessage] = useState("Zoom in to view parcels.");
@@ -191,6 +350,44 @@ export default function ParcelMap() {
     map.setLayoutProperty(SATELLITE_LAYER_ID, "visibility", basemapMode === "satellite" ? "visible" : "none");
     setParcelBoundaryPaint(map, basemapMode, getParcelLayerConfig().minZoom);
   }, [basemapMode]);
+
+  useEffect(() => {
+    activePanelRef.current = activePanel;
+    const map = mapRef.current;
+    if (!map) return;
+    map.getCanvas().style.cursor = activePanel === "measure" ? "crosshair" : "";
+  }, [activePanel]);
+
+  useEffect(() => {
+    measurementModeRef.current = measurementMode;
+    const map = mapRef.current;
+    if (!map) return;
+    setMeasurementSourceData(map, buildMeasurementCollection(measurementMode, measurementPoints));
+  }, [measurementMode, measurementPoints]);
+
+  function addMeasurementPoint(lng: number, lat: number) {
+    const nextPoint: MeasurementPoint = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      lng,
+      lat
+    };
+
+    setMeasurementPoints((current) => {
+      if (measurementModeRef.current === "rectangle") {
+        return current.length >= 2 ? [nextPoint] : [...current, nextPoint];
+      }
+      return [...current, nextPoint];
+    });
+  }
+
+  function changeMeasurementMode(nextMode: MeasurementMode) {
+    setMeasurementMode(nextMode);
+    setMeasurementPoints((current) => (nextMode === "rectangle" ? current.slice(0, 2) : current));
+  }
+
+  function removeMeasurementPoint(pointId: string) {
+    setMeasurementPoints((current) => current.filter((point) => point.id !== pointId));
+  }
 
   useEffect(() => {
     if (authLoading || !authData?.authenticated) return;
@@ -292,6 +489,7 @@ export default function ParcelMap() {
 
     function setSelectedParcelFeature(nextParcel: ParcelFeature | null) {
       setSelectedParcel(nextParcel);
+      if (nextParcel) setActivePanel("details");
       setGeoJsonSourceData(
         map,
         "selected-parcel",
@@ -448,6 +646,47 @@ export default function ParcelMap() {
         }
       });
 
+      map.addSource(MEASUREMENT_SOURCE_ID, {
+        type: "geojson",
+        data: buildMeasurementCollection(measurementModeRef.current, [])
+      });
+
+      map.addLayer({
+        id: MEASUREMENT_FILL_LAYER_ID,
+        type: "fill",
+        source: MEASUREMENT_SOURCE_ID,
+        filter: ["==", ["geometry-type"], "Polygon"],
+        paint: {
+          "fill-color": "#14b8a6",
+          "fill-opacity": 0.22
+        }
+      });
+
+      map.addLayer({
+        id: MEASUREMENT_LINE_LAYER_ID,
+        type: "line",
+        source: MEASUREMENT_SOURCE_ID,
+        filter: ["!=", ["geometry-type"], "Point"],
+        paint: {
+          "line-color": "#0f766e",
+          "line-width": 3,
+          "line-dasharray": [1.5, 1]
+        }
+      });
+
+      map.addLayer({
+        id: MEASUREMENT_POINT_LAYER_ID,
+        type: "circle",
+        source: MEASUREMENT_SOURCE_ID,
+        filter: ["==", ["geometry-type"], "Point"],
+        paint: {
+          "circle-radius": 6,
+          "circle-color": "#ffffff",
+          "circle-stroke-color": "#0f766e",
+          "circle-stroke-width": 3
+        }
+      });
+
       setParcelBoundaryPaint(map, basemapModeRef.current, parcelLayerConfig.minZoom);
       queueVisibleParcelLoad(0);
     });
@@ -457,6 +696,10 @@ export default function ParcelMap() {
     });
 
     map.on("click", async (event) => {
+      if (activePanelRef.current === "measure") {
+        addMeasurementPoint(event.lngLat.lng, event.lngLat.lat);
+        return;
+      }
       await selectParcelAt(event.lngLat.lng, event.lngLat.lat);
     });
 
@@ -538,6 +781,7 @@ export default function ParcelMap() {
     );
     setSelectedParcel(null);
     setSearchResults([]);
+    setActivePanel("map");
   }
 
   async function runSearch(event?: FormEvent<HTMLFormElement>) {
@@ -596,6 +840,7 @@ export default function ParcelMap() {
 
       const nextParcel = payload.data ?? null;
       setSelectedParcel(nextParcel);
+      if (nextParcel) setActivePanel("details");
       const selectedSource = map?.getSource("selected-parcel") as maplibregl.GeoJSONSource | undefined;
       selectedSource?.setData(
         nextParcel
@@ -757,8 +1002,8 @@ export default function ParcelMap() {
     <div className="map-layout">
       <div className="map-wrap">
         <div className="map-status">
-          <strong>{loading ? "Loading parcels…" : "Parcel layer"}</strong>
-          <p>{statusMessage}</p>
+          <strong>{activePanel === "measure" ? "Measurement mode" : loading ? "Loading parcels…" : "Parcel layer"}</strong>
+          <p>{activePanel === "measure" ? getMeasurementSummary(measurementMode, measurementPoints).hint : statusMessage}</p>
           {authData?.authEnabled && authData.authenticated ? (
             <div className="session-row">
               <span>{authData.user?.displayName ?? authData.user?.id ?? "Signed in"}</span>
@@ -790,6 +1035,8 @@ export default function ParcelMap() {
         <Disclaimer />
       </div>
       <ParcelDetails
+        activePanel={activePanel}
+        onActivePanelChange={setActivePanel}
         parcel={selectedParcel}
         visibleCount={visibleCount}
         totalInView={totalInView}
@@ -804,6 +1051,13 @@ export default function ParcelMap() {
         searchError={searchError}
         onSearchResultClick={selectSearchResult}
         onSavedParcelClick={selectSearchResult}
+        measurementMode={measurementMode}
+        measurementPoints={measurementPoints}
+        measurementSummary={getMeasurementSummary(measurementMode, measurementPoints)}
+        onMeasurementModeChange={changeMeasurementMode}
+        onMeasurementPointRemove={removeMeasurementPoint}
+        onMeasurementUndo={() => setMeasurementPoints((current) => current.slice(0, -1))}
+        onMeasurementClear={() => setMeasurementPoints([])}
       />
     </div>
   );

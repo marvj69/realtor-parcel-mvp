@@ -68,7 +68,7 @@
 - [ ] Lead/prospecting notes.
 - [ ] Showing notes.
 - [ ] Basic printable property brief.
-- [ ] Measurement tools for distance/area.
+- [x] Measurement tools for distance/area.
 - [ ] Absentee owner hint when owner mailing address differs from site address.
 - [ ] Simple acreage/land-use filters.
 

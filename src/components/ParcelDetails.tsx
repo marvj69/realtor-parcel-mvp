@@ -2,9 +2,12 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import SavedProjectsSidebar from "@/components/SavedProjectsSidebar";
+import type { AppPanel, MeasurementMode, MeasurementPoint, MeasurementSummary } from "@/types/measurement";
 import type { ParcelFeature, ParcelSearchResult } from "@/types/parcel";
 
 type Props = {
+  activePanel: AppPanel;
+  onActivePanelChange: (panel: AppPanel) => void;
   parcel: ParcelFeature | null;
   visibleCount: number;
   totalInView: number;
@@ -19,6 +22,13 @@ type Props = {
   searchError: string | null;
   onSearchResultClick: (result: ParcelSearchResult) => void;
   onSavedParcelClick: (result: ParcelSearchResult) => void;
+  measurementMode: MeasurementMode;
+  measurementPoints: MeasurementPoint[];
+  measurementSummary: MeasurementSummary;
+  onMeasurementModeChange: (mode: MeasurementMode) => void;
+  onMeasurementPointRemove: (pointId: string) => void;
+  onMeasurementUndo: () => void;
+  onMeasurementClear: () => void;
 };
 
 function fmt(value: unknown) {
@@ -58,7 +68,13 @@ function matchKindLabel(kind: ParcelSearchResult["matchKind"]) {
   }
 }
 
+function formatCoordinate(value: number) {
+  return value.toFixed(6);
+}
+
 export default function ParcelDetails({
+  activePanel,
+  onActivePanelChange,
   parcel,
   visibleCount,
   totalInView,
@@ -72,7 +88,14 @@ export default function ParcelDetails({
   searchLoading,
   searchError,
   onSearchResultClick,
-  onSavedParcelClick
+  onSavedParcelClick,
+  measurementMode,
+  measurementPoints,
+  measurementSummary,
+  onMeasurementModeChange,
+  onMeasurementPointRemove,
+  onMeasurementUndo,
+  onMeasurementClear
 }: Props) {
   const [projectName, setProjectName] = useState("Houghton Project");
   const [tag, setTag] = useState("showing");
@@ -130,164 +153,282 @@ export default function ParcelDetails({
     }
   }
 
+  function activatePanel(panel: AppPanel) {
+    onActivePanelChange(panel);
+  }
+
+  function selectSearchResult(result: ParcelSearchResult) {
+    onSearchResultClick(result);
+    activatePanel("details");
+  }
+
+  function selectSavedParcel(result: ParcelSearchResult) {
+    onSavedParcelClick(result);
+    activatePanel("details");
+  }
+
+  const isCollapsed = activePanel === "map";
+
   return (
-    <aside className="side-panel">
-      <section className="panel-section search-panel">
-        <h2>Find a parcel</h2>
-        <form className="search-form" onSubmit={onSearchSubmit}>
-          <label>
-            Search APN, owner, address, or mailing address
-            <div className="search-row">
-              <input
-                value={searchQuery}
-                onChange={(event) => onSearchQueryChange(event.target.value)}
-                placeholder="e.g. Shelden, 052-217, Lake Superior"
-              />
-              <button className="primary-button" disabled={searchLoading || searchQuery.trim().length < 2}>
-                {searchLoading ? "Searching…" : "Search"}
-              </button>
-            </div>
-          </label>
-        </form>
-        {searchError ? <p className="message subtle">{searchError}</p> : null}
-        {searchResults.length > 0 ? (
-          <div className="search-results">
-            {searchResults.map((result) => (
-              <button
-                key={result.id}
-                className="search-result"
-                type="button"
-                onClick={() => onSearchResultClick(result)}
-                disabled={!result.center}
-              >
-                <span className="result-title">{fmt(result.siteAddress) !== "—" ? fmt(result.siteAddress) : fmt(result.parcelId)}</span>
-                <span>
-                  {matchKindLabel(result.matchKind)}: {fmt(result.matchLabel)}
-                </span>
-                <span>{fmt(result.ownerName)}</span>
-                <span>
-                  {fmt(result.apn)} · {fmt(result.acreage)} ac
-                </span>
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </section>
+    <aside className={isCollapsed ? "side-panel collapsed" : "side-panel"} aria-label="Parcel workspace">
+      <nav className="bottom-tab-bar" aria-label="Workspace tools">
+        {(
+          [
+            ["map", "Map"],
+            ["search", "Search"],
+            ["saved", "Saved"],
+            ["details", parcel ? "Parcel" : "Details"],
+            ["measure", "Measure"]
+          ] as const
+        ).map(([panel, label]) => (
+          <button
+            className={activePanel === panel ? "active" : ""}
+            key={panel}
+            type="button"
+            aria-pressed={activePanel === panel}
+            onClick={() => activatePanel(panel)}
+          >
+            <span>{label}</span>
+            {panel === "details" && parcel ? <small>Selected</small> : null}
+            {panel === "measure" && measurementPoints.length > 0 ? <small>{measurementPoints.length}</small> : null}
+          </button>
+        ))}
+      </nav>
 
-      <SavedProjectsSidebar
-        refreshKey={projectRefreshKey}
-        activeParcelId={parcel?.properties.id ?? null}
-        onProjectNameSelect={setProjectName}
-        onSavedParcelSelect={onSavedParcelClick}
-      />
+      {!isCollapsed ? (
+        <div className="bottom-panel">
+          {activePanel === "search" ? (
+            <section className="panel-section search-panel">
+              <h2>Find a parcel</h2>
+              <form className="search-form" onSubmit={onSearchSubmit}>
+                <label>
+                  Search APN, owner, address, or mailing address
+                  <div className="search-row">
+                    <input
+                      value={searchQuery}
+                      onChange={(event) => onSearchQueryChange(event.target.value)}
+                      placeholder="e.g. Shelden, 052-217, Lake Superior"
+                    />
+                    <button className="primary-button" disabled={searchLoading || searchQuery.trim().length < 2}>
+                      {searchLoading ? "Searching…" : "Search"}
+                    </button>
+                  </div>
+                </label>
+              </form>
+              {searchError ? <p className="message subtle">{searchError}</p> : null}
+              {searchResults.length > 0 ? (
+                <div className="search-results">
+                  {searchResults.map((result) => (
+                    <button
+                      key={result.id}
+                      className="search-result"
+                      type="button"
+                      onClick={() => selectSearchResult(result)}
+                      disabled={!result.center}
+                    >
+                      <span className="result-title">
+                        {fmt(result.siteAddress) !== "—" ? fmt(result.siteAddress) : fmt(result.parcelId)}
+                      </span>
+                      <span>
+                        {matchKindLabel(result.matchKind)}: {fmt(result.matchLabel)}
+                      </span>
+                      <span>{fmt(result.ownerName)}</span>
+                      <span>
+                        {fmt(result.apn)} · {fmt(result.acreage)} ac
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
 
-      <section className="panel-section lookup-panel">
-        <h2>Parcel lookup</h2>
-        <p>
-          {loading
-            ? "Loading visible parcel outlines…"
-            : statusMessage}
-        </p>
-        {totalInView > visibleCount ? (
-          <p className="panel-note">{totalInView.toLocaleString()} parcels are in this map view.</p>
-        ) : null}
-        {error ? <p className="message error">{error}</p> : null}
-      </section>
+          {activePanel === "saved" ? (
+            <SavedProjectsSidebar
+              refreshKey={projectRefreshKey}
+              activeParcelId={parcel?.properties.id ?? null}
+              onProjectNameSelect={(nextProjectName) => {
+                setProjectName(nextProjectName);
+                activatePanel(parcel ? "details" : "search");
+              }}
+              onSavedParcelSelect={selectSavedParcel}
+            />
+          ) : null}
 
-      {!parcel ? (
-        <section className="empty-state">
-          <h3>No parcel selected</h3>
-          <p>Zoom in and click a parcel. If nothing appears, run the seed script or import a real county parcel dataset.</p>
-        </section>
-      ) : (
-        <>
-          <section className="panel-section">
-            <h2>{fmt(parcel.properties.siteAddress) !== "—" ? fmt(parcel.properties.siteAddress) : fmt(parcel.properties.parcelId)}</h2>
-            <p>{fmt(parcel.properties.ownerName)}</p>
-            <div className="detail-grid">
-              <div className="detail-row">
-                <span className="detail-label">Parcel ID</span>
-                <span className="detail-value">{fmt(parcel.properties.parcelId)}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">APN</span>
-                <span className="detail-value">{fmt(parcel.properties.apn)}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Owner</span>
-                <span className="detail-value">{fmt(parcel.properties.ownerName)}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Site address</span>
-                <span className="detail-value">{fmt(parcel.properties.siteAddress)}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Acreage</span>
-                <span className="detail-value">{fmt(parcel.properties.acreage)}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Land use</span>
-                <span className="detail-value">{fmt(parcel.properties.landUse)}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Assessed value</span>
-                <span className="detail-value">{money(parcel.properties.assessedValue)}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Mailing address</span>
-                <span className="detail-value">{fmt(parcel.properties.mailingAddress)}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">County / source</span>
-                <span className="detail-value">
-                  {fmt(parcel.properties.provider)} · {fmt(parcel.properties.sourceCounty)}, {fmt(parcel.properties.state)}
-                </span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Source key</span>
-                <span className="detail-value">{fmt(parcel.properties.sourceKey)}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Source updated</span>
-                <span className="detail-value">{date(parcel.properties.sourceUpdatedAt)}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Imported</span>
-                <span className="detail-value">{date(parcel.properties.importedAt)}</span>
-              </div>
-            </div>
-            <p className="detail-disclaimer">
-              Parcel boundaries are approximate and for general reference only. They are not a legal survey, title opinion,
-              zoning determination, or substitute for municipal/county verification.
-            </p>
-          </section>
+          {activePanel === "details" ? (
+            <>
+              <section className="panel-section lookup-panel">
+                <h2>Parcel lookup</h2>
+                <p>{loading ? "Loading visible parcel outlines…" : statusMessage}</p>
+                {totalInView > visibleCount ? (
+                  <p className="panel-note">{totalInView.toLocaleString()} parcels are in this map view.</p>
+                ) : null}
+                {error ? <p className="message error">{error}</p> : null}
+              </section>
 
-          <section className="panel-section">
-            <h3>Save to project</h3>
-            <div className="form-stack">
-              <label>
-                Project name
-                <input value={projectName} onChange={(event) => setProjectName(event.target.value)} />
-              </label>
-              <label>
-                Tag
-                <input value={tag} onChange={(event) => setTag(event.target.value)} placeholder="showing, lead, cma, follow-up" />
-              </label>
-              <label>
-                Note
-                <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Private note for this parcel" />
-              </label>
+              {!parcel ? (
+                <section className="empty-state">
+                  <h3>No parcel selected</h3>
+                  <p>Zoom in and click a parcel. If nothing appears, run the seed script or import a real county parcel dataset.</p>
+                </section>
+              ) : (
+                <>
+                  <section className="panel-section">
+                    <h2>{fmt(parcel.properties.siteAddress) !== "—" ? fmt(parcel.properties.siteAddress) : fmt(parcel.properties.parcelId)}</h2>
+                    <p>{fmt(parcel.properties.ownerName)}</p>
+                    <div className="detail-grid">
+                      <div className="detail-row">
+                        <span className="detail-label">Parcel ID</span>
+                        <span className="detail-value">{fmt(parcel.properties.parcelId)}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="detail-label">APN</span>
+                        <span className="detail-value">{fmt(parcel.properties.apn)}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="detail-label">Owner</span>
+                        <span className="detail-value">{fmt(parcel.properties.ownerName)}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="detail-label">Site address</span>
+                        <span className="detail-value">{fmt(parcel.properties.siteAddress)}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="detail-label">Acreage</span>
+                        <span className="detail-value">{fmt(parcel.properties.acreage)}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="detail-label">Land use</span>
+                        <span className="detail-value">{fmt(parcel.properties.landUse)}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="detail-label">Assessed value</span>
+                        <span className="detail-value">{money(parcel.properties.assessedValue)}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="detail-label">Mailing address</span>
+                        <span className="detail-value">{fmt(parcel.properties.mailingAddress)}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="detail-label">County / source</span>
+                        <span className="detail-value">
+                          {fmt(parcel.properties.provider)} · {fmt(parcel.properties.sourceCounty)}, {fmt(parcel.properties.state)}
+                        </span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="detail-label">Source key</span>
+                        <span className="detail-value">{fmt(parcel.properties.sourceKey)}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="detail-label">Source updated</span>
+                        <span className="detail-value">{date(parcel.properties.sourceUpdatedAt)}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="detail-label">Imported</span>
+                        <span className="detail-value">{date(parcel.properties.importedAt)}</span>
+                      </div>
+                    </div>
+                    <p className="detail-disclaimer">
+                      Parcel boundaries are approximate and for general reference only. They are not a legal survey, title opinion,
+                      zoning determination, or substitute for municipal/county verification.
+                    </p>
+                  </section>
+
+                  <section className="panel-section">
+                    <h3>Save to project</h3>
+                    <div className="form-stack">
+                      <label>
+                        Project name
+                        <input value={projectName} onChange={(event) => setProjectName(event.target.value)} />
+                      </label>
+                      <label>
+                        Tag
+                        <input value={tag} onChange={(event) => setTag(event.target.value)} placeholder="showing, lead, cma, follow-up" />
+                      </label>
+                      <label>
+                        Note
+                        <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Private note for this parcel" />
+                      </label>
+                      <div className="button-row">
+                        <button className="primary-button" type="button" disabled={saving || !projectName.trim()} onClick={saveParcel}>
+                          {saving ? "Saving…" : "Save parcel"}
+                        </button>
+                      </div>
+                      {saveMessage ? <p className="message success">{saveMessage}</p> : null}
+                      {saveError ? <p className="message error">{saveError}</p> : null}
+                    </div>
+                  </section>
+                </>
+              )}
+            </>
+          ) : null}
+
+          {activePanel === "measure" ? (
+            <section className="panel-section measure-panel">
+              <div className="section-heading-row">
+                <div>
+                  <h2>Measure</h2>
+                  <p>Tap the map to add points. Use the point list to remove individual points.</p>
+                </div>
+              </div>
+
+              <div className="measure-mode-row" role="group" aria-label="Measurement type">
+                {(
+                  [
+                    ["distance", "Distance"],
+                    ["area", "Area"],
+                    ["rectangle", "Box"]
+                  ] as const
+                ).map(([mode, label]) => (
+                  <button
+                    className={measurementMode === mode ? "active" : ""}
+                    key={mode}
+                    type="button"
+                    aria-pressed={measurementMode === mode}
+                    onClick={() => onMeasurementModeChange(mode)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="measurement-readout">
+                <span>{measurementSummary.title}</span>
+                <strong>{measurementSummary.primary}</strong>
+                <small>{measurementSummary.secondary}</small>
+                <p>{measurementSummary.hint}</p>
+              </div>
+
               <div className="button-row">
-                <button className="primary-button" disabled={saving || !projectName.trim()} onClick={saveParcel}>
-                  {saving ? "Saving…" : "Save parcel"}
+                <button className="secondary-button" type="button" onClick={onMeasurementUndo} disabled={measurementPoints.length === 0}>
+                  Undo point
+                </button>
+                <button className="secondary-button" type="button" onClick={onMeasurementClear} disabled={measurementPoints.length === 0}>
+                  Clear
                 </button>
               </div>
-              {saveMessage ? <p className="message success">{saveMessage}</p> : null}
-              {saveError ? <p className="message error">{saveError}</p> : null}
-            </div>
-          </section>
-        </>
-      )}
+
+              {measurementPoints.length > 0 ? (
+                <div className="measurement-point-list">
+                  {measurementPoints.map((point, index) => (
+                    <div className="measurement-point-row" key={point.id}>
+                      <span>
+                        Point {index + 1}
+                        <small>
+                          {formatCoordinate(point.lat)}, {formatCoordinate(point.lng)}
+                        </small>
+                      </span>
+                      <button className="text-button" type="button" onClick={() => onMeasurementPointRemove(point.id)}>
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+        </div>
+      ) : null}
     </aside>
   );
 }
