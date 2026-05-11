@@ -15,3 +15,4 @@ config/county-sources.local.json
 data/parcels/*.geojson
 data/parcels/*.json
 data/parcels/*.zip
+.env*.local
