@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import maplibregl from "maplibre-gl";
 import { area as turfArea, bbox as turfBbox, length as turfLength, lineString as turfLineString, polygon as turfPolygon } from "@turf/turf";
 import type { Feature, FeatureCollection, Geometry, MultiPolygon, Polygon, Position } from "geojson";
-import Disclaimer from "@/components/Disclaimer";
 import ParcelDetails from "@/components/ParcelDetails";
 import type { AppPanel, MeasurementMode, MeasurementPoint, MeasurementSummary } from "@/types/measurement";
 import type { ParcelFeature, ParcelProperties, ParcelSearchResult } from "@/types/parcel";
@@ -1092,7 +1091,6 @@ export default function ParcelMap() {
         >
           <span className="map-basemap-icon">{basemapMode === "streets" ? <TreeIcon /> : <GlobeIcon />}</span>
         </button>
-        <Disclaimer />
       </div>
       <ParcelDetails
         activePanel={activePanel}
