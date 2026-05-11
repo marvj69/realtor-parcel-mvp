@@ -67,6 +67,7 @@ type AuthPayload = {
   ok?: boolean;
   data?: {
     authEnabled: boolean;
+    accountCreationEnabled: boolean;
     authenticated: boolean;
     user: {
       id: string;
@@ -76,6 +77,8 @@ type AuthPayload = {
   };
   error?: string;
 };
+
+type AuthMode = "sign-in" | "create-account";
 
 export default function ParcelMap() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -95,8 +98,14 @@ export default function ParcelMap() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authData, setAuthData] = useState<AuthPayload["data"] | null>(null);
+  const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [authUsername, setAuthUsername] = useState("");
   const [authPassword, setAuthPassword] = useState("");
+  const [signupName, setSignupName] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("");
+  const [signupWorkspacePassword, setSignupWorkspacePassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -413,6 +422,41 @@ export default function ParcelMap() {
     }
   }
 
+  async function createAccount(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAuthError(null);
+
+    if (signupPassword !== signupPasswordConfirm) {
+      setAuthError("Passwords do not match");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: signupEmail.trim(),
+          displayName: signupName.trim() || undefined,
+          password: signupPassword,
+          workspacePassword: signupWorkspacePassword
+        })
+      });
+      const payload = (await response.json()) as AuthPayload;
+      if (!response.ok || !payload.ok || !payload.data) {
+        throw new Error(payload.error ?? "Unable to create account");
+      }
+
+      setAuthData(payload.data);
+      setSignupPassword("");
+      setSignupPasswordConfirm("");
+      setSignupWorkspacePassword("");
+      setAuthPassword("");
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : "Unable to create account");
+    }
+  }
+
   async function logout() {
     await fetch("/api/auth/session", { method: "DELETE" }).catch(() => null);
     setAuthData((current) =>
@@ -524,30 +568,128 @@ export default function ParcelMap() {
   }
 
   if (authData?.authEnabled && !authData.authenticated) {
+    const canCreateAccount = Boolean(authData.accountCreationEnabled);
+    const signupDisabled =
+      !signupEmail.trim() ||
+      signupPassword.length < 8 ||
+      signupPassword !== signupPasswordConfirm ||
+      !signupWorkspacePassword;
+
     return (
       <div className="map-layout">
         <section className="auth-panel">
-          <h2>Private parcel workspace</h2>
-          <p>Sign in to view Houghton County parcel data and saved projects.</p>
-          <form className="form-stack" onSubmit={login}>
-            <label>
-              Username
-              <input value={authUsername} onChange={(event) => setAuthUsername(event.target.value)} autoComplete="username" />
-            </label>
-            <label>
-              Password
-              <input
-                value={authPassword}
-                onChange={(event) => setAuthPassword(event.target.value)}
-                type="password"
-                autoComplete="current-password"
-              />
-            </label>
-            <button className="primary-button" disabled={!authPassword}>
-              Sign in
-            </button>
-            {authError ? <p className="message error">{authError}</p> : null}
-          </form>
+          {authMode === "sign-in" ? (
+            <>
+              <h2>Private parcel workspace</h2>
+              <p>Sign in to view Houghton County parcel data and saved projects.</p>
+              <form className="form-stack" onSubmit={login}>
+                <label>
+                  Email or username
+                  <input
+                    value={authUsername}
+                    onChange={(event) => setAuthUsername(event.target.value)}
+                    autoComplete="username"
+                  />
+                </label>
+                <label>
+                  Password
+                  <input
+                    value={authPassword}
+                    onChange={(event) => setAuthPassword(event.target.value)}
+                    type="password"
+                    autoComplete="current-password"
+                  />
+                </label>
+                <button className="primary-button" disabled={!authPassword}>
+                  Sign in
+                </button>
+                {authError ? <p className="message error">{authError}</p> : null}
+              </form>
+              {canCreateAccount ? (
+                <div className="auth-action-row">
+                  <span>Need access?</span>
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={() => {
+                      setAuthError(null);
+                      setAuthMode("create-account");
+                    }}
+                  >
+                    Create an account
+                  </button>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <h2>Create an account</h2>
+              <p>Use the workspace password once to set up your own login.</p>
+              <form className="form-stack" onSubmit={createAccount}>
+                <label>
+                  Name
+                  <input
+                    value={signupName}
+                    onChange={(event) => setSignupName(event.target.value)}
+                    autoComplete="name"
+                  />
+                </label>
+                <label>
+                  Email
+                  <input
+                    value={signupEmail}
+                    onChange={(event) => setSignupEmail(event.target.value)}
+                    autoComplete="email"
+                    type="email"
+                  />
+                </label>
+                <label>
+                  Password
+                  <input
+                    value={signupPassword}
+                    onChange={(event) => setSignupPassword(event.target.value)}
+                    type="password"
+                    autoComplete="new-password"
+                  />
+                </label>
+                <label>
+                  Confirm password
+                  <input
+                    value={signupPasswordConfirm}
+                    onChange={(event) => setSignupPasswordConfirm(event.target.value)}
+                    type="password"
+                    autoComplete="new-password"
+                  />
+                </label>
+                <label>
+                  Workspace password
+                  <input
+                    value={signupWorkspacePassword}
+                    onChange={(event) => setSignupWorkspacePassword(event.target.value)}
+                    type="password"
+                    autoComplete="one-time-code"
+                  />
+                </label>
+                <button className="primary-button" disabled={signupDisabled}>
+                  Create account
+                </button>
+                {authError ? <p className="message error">{authError}</p> : null}
+              </form>
+              <div className="auth-action-row">
+                <span>Already have an account?</span>
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() => {
+                    setAuthError(null);
+                    setAuthMode("sign-in");
+                  }}
+                >
+                  Sign in
+                </button>
+              </div>
+            </>
+          )}
         </section>
       </div>
     );

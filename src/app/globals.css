@@ -90,6 +90,15 @@ textarea {
   color: var(--muted);
 }
 
+.auth-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .map-wrap {
   position: relative;
   min-width: 0;

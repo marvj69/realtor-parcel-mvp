@@ -67,11 +67,26 @@ CREATE INDEX IF NOT EXISTS parcels_text_search_idx ON parcels USING gin (
 CREATE TABLE IF NOT EXISTS app_users (
   id text PRIMARY KEY,
   email text,
+  email_normalized text,
   display_name text,
   auth_provider text NOT NULL DEFAULT 'private_env',
+  password_hash text,
+  last_login_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email_normalized text;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS password_hash text;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS last_login_at timestamptz;
+
+UPDATE app_users
+SET email_normalized = lower(trim(email))
+WHERE email IS NOT NULL AND email_normalized IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS app_users_email_normalized_idx
+  ON app_users (email_normalized)
+  WHERE email_normalized IS NOT NULL;
 
 INSERT INTO app_users (id, display_name, auth_provider)
 VALUES ('private-app-user', 'Private app user', 'private_env')

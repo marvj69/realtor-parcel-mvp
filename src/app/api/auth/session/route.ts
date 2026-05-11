@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { apiRateLimits, withApiGuard } from "@/lib/api-guard";
+import { verifyPasswordAccount } from "@/lib/accounts";
 import {
   AUTH_COOKIE_NAME,
   createSessionToken,
@@ -19,7 +20,7 @@ import { ensureAppUser } from "@/lib/ownership";
 export const runtime = "nodejs";
 
 const loginSchema = z.object({
-  username: z.string().trim().max(120).optional(),
+  username: z.string().trim().max(254).optional(),
   password: z.string().min(1).max(500)
 });
 
@@ -30,6 +31,7 @@ async function getSession(request: Request) {
     ok: true,
     data: {
       authEnabled: isPrivateAuthEnabled(),
+      accountCreationEnabled: isPrivateAuthEnabled() && hasDatabaseConfig(),
       authenticated: Boolean(user),
       user: user ? toPublicUser(user) : null
     }
@@ -50,6 +52,7 @@ async function createSession(request: Request) {
       ok: true,
       data: {
         authEnabled: false,
+        accountCreationEnabled: false,
         authenticated: true,
         user: toPublicUser({ ...configuredUser, authenticated: true, authEnabled: false })
       }
@@ -59,6 +62,27 @@ async function createSession(request: Request) {
   }
 
   const { username, password } = parsed.data;
+  if (username && hasDatabaseConfig()) {
+    const accountResult = await verifyPasswordAccount(username, password);
+    if (accountResult.status === "matched") {
+      const response = NextResponse.json({
+        ok: true,
+        data: {
+          authEnabled: true,
+          accountCreationEnabled: true,
+          authenticated: true,
+          user: toPublicUser(accountResult.user)
+        }
+      });
+      response.cookies.set(AUTH_COOKIE_NAME, createSessionToken(accountResult.user), sessionCookieOptions());
+      return response;
+    }
+
+    if (accountResult.status === "invalid") {
+      return NextResponse.json({ ok: false, error: "Invalid credentials" }, { status: 401 });
+    }
+  }
+
   if (!verifyPrivateAppUsername(username) || !verifyPrivateAppPassword(password)) {
     return NextResponse.json({ ok: false, error: "Invalid credentials" }, { status: 401 });
   }
@@ -75,6 +99,7 @@ async function createSession(request: Request) {
     ok: true,
     data: {
       authEnabled: true,
+      accountCreationEnabled: hasDatabaseConfig(),
       authenticated: true,
       user: toPublicUser(user)
     }
@@ -88,6 +113,7 @@ async function deleteSession() {
     ok: true,
     data: {
       authEnabled: isPrivateAuthEnabled(),
+      accountCreationEnabled: isPrivateAuthEnabled() && hasDatabaseConfig(),
       authenticated: false,
       user: null
     }

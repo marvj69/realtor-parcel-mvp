@@ -1,7 +1,8 @@
 import "server-only";
 
 import type { NextResponse } from "next/server";
-import { createHash, createHmac, timingSafeEqual } from "crypto";
+import { createHash, createHmac, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "crypto";
+import { promisify } from "util";
 import { getNumberEnv } from "@/lib/env";
 
 export const AUTH_COOKIE_NAME = "realtor_parcel_session";
@@ -9,6 +10,9 @@ export const DEFAULT_APP_USER_ID = "private-app-user";
 
 const TOKEN_VERSION = 1;
 const DEFAULT_SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
+const PASSWORD_HASH_VERSION = "scrypt-v1";
+const PASSWORD_KEY_LENGTH = 64;
+const scrypt = promisify(scryptCallback);
 
 export type AppUser = {
   id: string;
@@ -97,6 +101,27 @@ export function verifyPrivateAppUsername(username: string | null | undefined) {
   return timingSafeTextEqual(username?.trim() ?? "", expected);
 }
 
+export function normalizeAccountEmail(email: string | null | undefined) {
+  return email?.trim().toLowerCase() ?? "";
+}
+
+export async function createPasswordHash(password: string) {
+  const salt = randomBytes(16).toString("base64url");
+  const derivedKey = (await scrypt(password, salt, PASSWORD_KEY_LENGTH)) as Buffer;
+  return `${PASSWORD_HASH_VERSION}$${salt}$${derivedKey.toString("base64url")}`;
+}
+
+export async function verifyPasswordHash(password: string, storedHash: string) {
+  const [version, salt, storedKey] = storedHash.split("$");
+  if (version !== PASSWORD_HASH_VERSION || !salt || !storedKey) return false;
+
+  const storedBuffer = Buffer.from(storedKey, "base64url");
+  const derivedKey = (await scrypt(password, salt, storedBuffer.length)) as Buffer;
+
+  if (storedBuffer.length !== derivedKey.length) return false;
+  return timingSafeEqual(storedBuffer, derivedKey);
+}
+
 export function createSessionToken(user = getConfiguredAppUser()) {
   const secret = getSessionSecret();
   if (!secret) {
@@ -138,10 +163,9 @@ function verifySessionToken(token: string): SessionPayload | null {
   if (!timingSafeTextEqual(signature, expected)) return null;
 
   const payload = decodeJson<SessionPayload>(body);
-  const configuredUser = getConfiguredAppUser();
   const now = Math.floor(Date.now() / 1000);
 
-  if (!payload || payload.v !== TOKEN_VERSION || payload.sub !== configuredUser.id || payload.exp <= now) {
+  if (!payload || payload.v !== TOKEN_VERSION || !payload.sub || payload.exp <= now) {
     return null;
   }
 

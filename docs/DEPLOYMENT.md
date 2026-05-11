@@ -19,9 +19,9 @@
 | `PARCEL_BBOX_LIMIT` | Yes | Vercel + local `.env.local` | Server-side cap for bbox parcel results. |
 | `API_RATE_LIMIT_PER_MINUTE` | Optional | Vercel + local `.env.local` | Default per-route in-memory rate-limit fallback. Route-specific limits live in `src/lib/api-guard.ts`. |
 | `API_RATE_LIMIT_DISABLED` | Optional | Local only | Set to `true` only for local debugging. Keep `false` in production. |
-| `APP_AUTH_PASSWORD` | Recommended for production | Vercel + private local `.env.local` | Enables private-app password auth. Leave empty only for local/demo open mode. Never use a `NEXT_PUBLIC_` prefix. |
+| `APP_AUTH_PASSWORD` | Recommended for production | Vercel + private local `.env.local` | Enables private-app password auth and acts as the workspace invite password for account creation. Leave empty only for local/demo open mode. Never use a `NEXT_PUBLIC_` prefix. |
 | `APP_AUTH_SESSION_SECRET` | Recommended for production | Vercel + private local `.env.local` | Secret used to sign HTTP-only session cookies. Use a long random value. |
-| `APP_AUTH_USERNAME` | Optional | Vercel + private local `.env.local` | Optional username gate in addition to the password. |
+| `APP_AUTH_USERNAME` | Optional | Vercel + private local `.env.local` | Optional username gate for the legacy shared-password sign-in path. Email/password accounts sign in with their email. |
 | `APP_AUTH_USER_ID` | Optional | Vercel + private local `.env.local` | Stable owner key for saved projects/parcels. Defaults to `private-app-user`. Do not change after saving data unless you intentionally want a new owner scope. |
 | `APP_AUTH_USER_EMAIL` | Optional | Vercel + private local `.env.local` | Server-side owner metadata. |
 | `APP_AUTH_USER_NAME` | Optional | Vercel + private local `.env.local` | Server-side owner display name. |
@@ -48,5 +48,6 @@ For MVP, `db/schema.sql` is enough. Later, move to a migration tool such as Driz
 Before adding external users:
 
 - Confirm `APP_AUTH_PASSWORD` and `APP_AUTH_SESSION_SECRET` are set in Vercel.
+- Run `npm run db:schema` so the `app_users` account columns and unique email index exist.
 - Add import job logs.
 - Add privacy policy / terms if shared beyond internal use.

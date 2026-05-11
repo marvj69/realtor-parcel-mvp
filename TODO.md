@@ -27,6 +27,7 @@
 - [x] Verify local dense-view, search, click lookup, and save API smoke tests.
 - [x] Add saved-project sidebar/list UI with saved parcel notes.
 - [x] Add private-app sign-in/sign-out UI backed by server-only env vars.
+- [x] Add database-backed create-account flow using the private workspace password.
 - [x] Add vector-tile parcel layer for dense Houghton views.
 - [x] Add API rate limiting and structured request logging.
 - [x] Improve search ranking/autocomplete with APN prefix boosts.
