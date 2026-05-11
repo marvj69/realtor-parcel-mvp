@@ -1,0 +1,17 @@
+node_modules
+.next
+out
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.vercel
+.DS_Store
+*.log
+*.tsbuildinfo
+coverage
+config/county-sources.local.json
+data/parcels/*.geojson
+data/parcels/*.json
+data/parcels/*.zip

@@ -1,0 +1,38 @@
+{
+  "name": "realtor-parcel-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "db:schema": "tsx scripts/apply-schema.ts db/schema.sql",
+    "db:seed": "tsx scripts/apply-schema.ts db/seed.sql",
+    "parcels:fetch": "tsx scripts/fetch-arcgis-layer.ts",
+    "parcels:import": "tsx scripts/import-parcels-from-geojson.ts"
+  },
+  "dependencies": {
+    "@turf/turf": "latest",
+    "dotenv": "latest",
+    "maplibre-gl": "latest",
+    "next": "latest",
+    "pg": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "latest",
+    "@types/geojson": "latest",
+    "@types/node": "latest",
+    "@types/pg": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "eslint": "latest",
+    "eslint-config-next": "latest",
+    "tsx": "latest",
+    "typescript": "latest"
+  }
+}

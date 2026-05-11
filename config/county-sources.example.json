@@ -1,0 +1,24 @@
+[
+  {
+    "sourceKey": "houghton-mi-example",
+    "provider": "Public county GIS",
+    "county": "Houghton",
+    "state": "MI",
+    "sourceType": "arcgis_feature_server",
+    "sourceUrl": "REPLACE_WITH_VALID_ARCGIS_FEATURESERVER_LAYER_QUERY_URL_OR_LAYER_URL",
+    "inputFile": "data/parcels/houghton-mi-example.geojson",
+    "notes": "Replace URL and field names after validating the actual public GIS source.",
+    "fieldMap": {
+      "sourceFeatureId": ["OBJECTID", "FID", "ID"],
+      "parcelId": ["PARCEL_ID", "PARCELID", "PARCELNO", "PARCEL_NUM", "PIN", "PROP_ID"],
+      "apn": ["APN", "PIN", "PARCEL_ID", "PARCELNO"],
+      "ownerName": ["OWNER", "OWNER_NAME", "OWNERNAME", "OWNERNME1", "TAXPAYER"],
+      "siteAddress": ["SITE_ADDRESS", "SITUS", "SITUS_ADDR", "PROPERTY_ADDRESS", "ADDRESS"],
+      "mailingAddress": ["MAIL_ADDRESS", "MAILING_ADDRESS", "OWNER_ADDRESS", "TAXPAYER_ADDRESS"],
+      "acreage": ["ACRES", "ACREAGE", "SHAPE_AREA_ACRES", "AREA_ACRES"],
+      "assessedValue": ["ASSESSED_VALUE", "AV", "TOTAL_AV", "TAXABLE_VALUE"],
+      "landUse": ["LAND_USE", "LANDUSE", "CLASS", "PROP_CLASS", "PROPERTY_CLASS"],
+      "legalDescription": ["LEGAL", "LEGAL_DESC", "LEGAL_DESCRIPTION"]
+    }
+  }
+]
