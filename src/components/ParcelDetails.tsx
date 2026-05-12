@@ -302,6 +302,10 @@ export default function ParcelDetails({
                         <span className="detail-value">{fmt(parcel.properties.landUse)}</span>
                       </div>
                       <div className="detail-row">
+                        <span className="detail-label">Source legal description</span>
+                        <span className="detail-value">{parcel.properties.legalDescription?.trim() || "Not available from source"}</span>
+                      </div>
+                      <div className="detail-row">
                         <span className="detail-label">Assessed value</span>
                         <span className="detail-value">{money(parcel.properties.assessedValue)}</span>
                       </div>
