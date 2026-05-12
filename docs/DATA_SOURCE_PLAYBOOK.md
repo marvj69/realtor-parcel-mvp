@@ -69,6 +69,20 @@ Land use: LAND_USE, CLASS, PROP_CLASS
 
 Keep field mappings in `config/county-sources.local.json`.
 
+The committed Upper Peninsula source starter lives at
+`config/upper-peninsula-county-sources.example.json`. Use it with `--config=...`
+when fetching or importing those public county layers.
+
+For sources that split a value across several fields, put a nested array in the
+candidate list. The importer will concatenate the first nested group with data,
+which keeps county-specific address weirdness in config instead of code:
+
+```json
+{
+  "mailingAddress": [["OWNER_STREET", "OWNER_CITY", "OWNER_STATE", "OWNER_ZIP"], "OWNER_ADDRESS"]
+}
+```
+
 ## Import workflow
 
 ```bash

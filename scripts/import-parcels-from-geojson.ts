@@ -6,7 +6,8 @@ import { getDatabaseConnectionString, loadEnv } from "./load-env";
 
 loadEnv();
 
-type FieldMap = Record<string, string[]>;
+type FieldCandidate = string | string[];
+type FieldMap = Record<string, FieldCandidate[]>;
 
 type CountySource = {
   sourceKey: string;
@@ -63,29 +64,79 @@ function getConfig(): CountySource {
   return source;
 }
 
-function pick(props: Record<string, unknown>, candidates: string[] | undefined): string | number | null {
-  if (!candidates) return null;
-  for (const key of candidates) {
-    const direct = props[key];
-    if (direct !== undefined && direct !== null && direct !== "") return direct as string | number;
+function readProp(props: Record<string, unknown>, key: string): unknown {
+  const direct = props[key];
+  if (direct !== undefined && direct !== null && direct !== "") return direct;
 
-    const matchedKey = Object.keys(props).find((propKey) => propKey.toLowerCase() === key.toLowerCase());
-    if (matchedKey) {
-      const value = props[matchedKey];
-      if (value !== undefined && value !== null && value !== "") return value as string | number;
+  const matchedKey = Object.keys(props).find((propKey) => propKey.toLowerCase() === key.toLowerCase());
+  if (!matchedKey) return null;
+
+  const value = props[matchedKey];
+  return value !== undefined && value !== null && value !== "" ? value : null;
+}
+
+function sanitizeString(value: string): string {
+  return value.replace(/\u0000/g, "");
+}
+
+function sanitizeValue(value: unknown): unknown {
+  if (typeof value === "string") return sanitizeString(value);
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => sanitizeValue(item))
+      .filter((item) => item !== null && item !== undefined && item !== "");
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).flatMap(([key, item]) => {
+      const sanitized = sanitizeValue(item);
+      if (sanitized === null || sanitized === undefined || sanitized === "") return [];
+      if (typeof sanitized === "object" && !Array.isArray(sanitized) && Object.keys(sanitized).length === 0) return [];
+      if (Array.isArray(sanitized) && sanitized.length === 0) return [];
+      return [[key, sanitized] as const];
+    });
+    return Object.fromEntries(entries);
+  }
+  return value;
+}
+
+function asPartString(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const text = sanitizeString(String(value)).trim();
+  if (!text || /^0(?:\.0+)?e[-+]?\d+$/i.test(text)) return null;
+  return text;
+}
+
+function pick(props: Record<string, unknown>, candidates: FieldCandidate[] | undefined): string | number | null {
+  if (!candidates) return null;
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      const parts = candidate
+        .map((key) => asPartString(readProp(props, key)))
+        .filter((part): part is string => Boolean(part));
+
+      if (parts.length > 0) {
+        return parts.join(", ");
+      }
+      continue;
     }
+
+    const value = readProp(props, candidate);
+    if (value !== null) return value as string | number;
   }
   return null;
 }
 
 function asString(value: string | number | null): string | null {
   if (value === null || value === undefined) return null;
-  return String(value).trim() || null;
+  return sanitizeString(String(value)).trim() || null;
 }
 
 function asNumber(value: string | number | null): number | null {
   if (value === null || value === undefined || value === "") return null;
-  const parsed = Number(String(value).replace(/[$,]/g, ""));
+  const cleaned = sanitizeString(String(value)).replace(/[$,]/g, "").trim();
+  const numericText = cleaned.match(/-?\d+(?:\.\d+)?/)?.[0];
+  if (!numericText) return null;
+  const parsed = Number(numericText);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -98,9 +149,12 @@ function toMultiPolygonGeometry(geometry: Geometry | null): Polygon | MultiPolyg
 async function insertParcelBatch(client: Client, records: ParcelImportRecord[]) {
   if (records.length === 0) return;
 
+  const uniqueRecords = Array.from(
+    new Map(records.map((record) => [`${record.sourceKey}\u0001${record.sourceFeatureId}`, record])).values()
+  );
   const columnsPerRow = 16;
   const params: unknown[] = [];
-  const values = records.map((record, rowIndex) => {
+  const values = uniqueRecords.map((record, rowIndex) => {
     params.push(
       record.sourceKey,
       record.sourceFeatureId,
@@ -235,7 +289,7 @@ async function main() {
     let batch: ParcelImportRecord[] = [];
 
     for (const feature of geojson.features as Feature[]) {
-      const properties = (feature.properties ?? {}) as Record<string, unknown>;
+      const properties = sanitizeValue(feature.properties ?? {}) as Record<string, unknown>;
       const geometry = toMultiPolygonGeometry(feature.geometry);
       if (!geometry) {
         skipped += 1;

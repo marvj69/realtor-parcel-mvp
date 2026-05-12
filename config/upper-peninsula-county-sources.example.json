@@ -1,0 +1,638 @@
+[
+  {
+    "sourceKey": "keweenaw-mi-2024",
+    "provider": "Keweenaw County / public ArcGIS FeatureServer",
+    "county": "Keweenaw",
+    "state": "MI",
+    "sourceType": "arcgis_feature_server",
+    "sourceUrl": "https://portal1-geo.sabu.mtu.edu/server/rest/services/Hosted/Keweenaw_MI_Parcels_2024/FeatureServer/0",
+    "sourceUpdatedAt": "2024-04-25T00:00:00.000Z",
+    "inputFile": "data/parcels/keweenaw-mi-2024.geojson",
+    "refreshCadence": "monthly metadata check; quarterly full refresh",
+    "lastRefreshReviewedAt": null,
+    "refreshNotes": "Private personal MVP import from the public Keweenaw parcel FeatureServer. Verify county terms before any commercial reuse.",
+    "notes": "Public parcel layer supports GeoJSON and outSR=4326.",
+    "fieldMap": {
+      "sourceFeatureId": [
+        "fid",
+        "objectid",
+        "ogr_fid",
+        "pid"
+      ],
+      "parcelId": [
+        "pid",
+        "qfpid"
+      ],
+      "apn": [
+        "pid",
+        "qfpid"
+      ],
+      "ownerName": [
+        "owner"
+      ],
+      "siteAddress": [
+        "propaddres",
+        [
+          "stnum",
+          "stdir",
+          "strname",
+          "stapt"
+        ]
+      ],
+      "mailingAddress": [
+        [
+          "owneraddre",
+          "ownercity",
+          "ownerstate",
+          "ownerzip"
+        ],
+        "owneraddre"
+      ],
+      "acreage": [
+        "recordacre",
+        "atlasacres"
+      ],
+      "assessedValue": [
+        "assessedva",
+        "sev",
+        "finaltaxab"
+      ],
+      "landUse": [
+        "class",
+        "UseClass"
+      ],
+      "legalDescription": [
+        "legal"
+      ]
+    }
+  },
+  {
+    "sourceKey": "ontonagon-mi-public",
+    "provider": "Ontonagon County / public ArcGIS FeatureServer",
+    "county": "Ontonagon",
+    "state": "MI",
+    "sourceType": "arcgis_feature_server",
+    "sourceUrl": "https://portal1-geo.sabu.mtu.edu/server/rest/services/Hosted/Ontonagon_County_Parcels/FeatureServer/0",
+    "sourceUpdatedAt": "2023-12-01T17:37:13.000Z",
+    "inputFile": "data/parcels/ontonagon-mi-public.geojson",
+    "refreshCadence": "monthly metadata check; quarterly full refresh",
+    "lastRefreshReviewedAt": null,
+    "refreshNotes": "Private personal MVP import from a public parcel FeatureServer. Verify county terms before any commercial reuse.",
+    "notes": "Public layer has parcel id, owner-like parcel master fields, mailing fields, and acreage.",
+    "fieldMap": {
+      "sourceFeatureId": [
+        "fid",
+        "objectid",
+        "pin"
+      ],
+      "parcelId": [
+        "pin"
+      ],
+      "apn": [
+        "pin"
+      ],
+      "ownerName": [
+        "parcelmast",
+        "parcelma_1"
+      ],
+      "siteAddress": [
+        "parcelma_2"
+      ],
+      "mailingAddress": [
+        [
+          "parcelma_3",
+          "parcelma_4",
+          "parcelma_5",
+          "parcelma_6"
+        ],
+        [
+          "parcelma_1",
+          "parcelma_2",
+          "parcelma_3",
+          "parcelma_4",
+          "parcelma_5",
+          "parcelma_6"
+        ]
+      ],
+      "acreage": [
+        "acres"
+      ],
+      "assessedValue": [],
+      "landUse": [
+        "parcels_pr"
+      ],
+      "legalDescription": []
+    }
+  },
+  {
+    "sourceKey": "baraga-mi-public",
+    "provider": "Baraga County / public ArcGIS FeatureServer",
+    "county": "Baraga",
+    "state": "MI",
+    "sourceType": "arcgis_feature_server",
+    "sourceUrl": "https://portal1-geo.sabu.mtu.edu/server/rest/services/Hosted/Baraga_County_Parcels/FeatureServer/0",
+    "sourceUpdatedAt": null,
+    "inputFile": "data/parcels/baraga-mi-public.geojson",
+    "refreshCadence": "monthly metadata check; quarterly full refresh",
+    "lastRefreshReviewedAt": null,
+    "refreshNotes": "Private personal MVP import from a public parcel FeatureServer. Verify county terms before any commercial reuse.",
+    "notes": "Public layer is geometry-first and only exposes parcel id and property address attributes.",
+    "fieldMap": {
+      "sourceFeatureId": [
+        "fid",
+        "pid"
+      ],
+      "parcelId": [
+        "pid"
+      ],
+      "apn": [
+        "pid"
+      ],
+      "ownerName": [],
+      "siteAddress": [
+        "propaddres"
+      ],
+      "mailingAddress": [],
+      "acreage": [],
+      "assessedValue": [],
+      "landUse": [],
+      "legalDescription": []
+    }
+  },
+  {
+    "sourceKey": "gogebic-mi-public",
+    "provider": "Gogebic County / public ArcGIS FeatureServer",
+    "county": "Gogebic",
+    "state": "MI",
+    "sourceType": "arcgis_feature_server",
+    "sourceUrl": "https://portal1-geo.sabu.mtu.edu/server/rest/services/Hosted/gogebic_wgs_(2)/FeatureServer/0",
+    "sourceUpdatedAt": "2023-12-04T14:47:39.000Z",
+    "inputFile": "data/parcels/gogebic-mi-public.geojson",
+    "refreshCadence": "monthly metadata check; quarterly full refresh",
+    "lastRefreshReviewedAt": null,
+    "refreshNotes": "Private personal MVP import from a public parcel FeatureServer. Verify county terms before any commercial reuse.",
+    "notes": "Public layer has parcel id, owner, and mailing fields; no site address or acreage field was exposed.",
+    "fieldMap": {
+      "sourceFeatureId": [
+        "fid",
+        "objectid",
+        "pin_1"
+      ],
+      "parcelId": [
+        "pin_1"
+      ],
+      "apn": [
+        "pin_1"
+      ],
+      "ownerName": [
+        [
+          "owner_1",
+          "owner_2"
+        ],
+        "owner_1"
+      ],
+      "siteAddress": [],
+      "mailingAddress": [
+        [
+          "address_1",
+          "address_2",
+          "city",
+          "state",
+          "zip"
+        ]
+      ],
+      "acreage": [],
+      "assessedValue": [],
+      "landUse": [],
+      "legalDescription": []
+    }
+  },
+  {
+    "sourceKey": "marquette-mi-fetchgis",
+    "provider": "Marquette County / FetchGIS public ArcGIS proxy",
+    "county": "Marquette",
+    "state": "MI",
+    "sourceType": "arcgis_feature_server",
+    "sourceUrl": "https://app.fetchgis.com/geoservices/fgis/mqtParcels/FeatureServer/0",
+    "sourceFormat": "arcgis_json",
+    "sourceProjection": "EPSG:3857",
+    "proxyUrl": "https://app.fetchgis.com/proxy/ags/proxy.ashx?",
+    "requestReferer": "https://app.fetchgis.com/?currentMap=marquette",
+    "outSR": null,
+    "pageSize": 8000,
+    "sourceUpdatedAt": null,
+    "inputFile": "data/parcels/marquette-mi-fetchgis.geojson",
+    "refreshCadence": "monthly metadata check; quarterly full refresh",
+    "lastRefreshReviewedAt": null,
+    "refreshNotes": "Private personal MVP import from county-linked FetchGIS public parcel layer. Verify county or FetchGIS terms before any commercial reuse.",
+    "notes": "FetchGIS proxy returns ArcGIS JSON in Web Mercator, then the fetch script converts geometry to WGS84 GeoJSON.",
+    "fieldMap": {
+      "sourceFeatureId": [
+        "OBJECTID",
+        "GlobalID",
+        "PARCEL_ID"
+      ],
+      "parcelId": [
+        "PARCEL_ID",
+        "PARCEL_ID_",
+        "PARCEL_ID1"
+      ],
+      "apn": [
+        "PARCEL_ID",
+        "PARCEL_ID_",
+        "PARCEL_ID1"
+      ],
+      "ownerName": [
+        [
+          "OWNER1",
+          "OWNER2",
+          "OWNER3"
+        ],
+        "OWNER1"
+      ],
+      "siteAddress": [
+        [
+          "PROP_ADD",
+          "PROP_CITY"
+        ],
+        [
+          "PROP_ADD_1",
+          "PROP_CITY_"
+        ],
+        "PROP_ADD"
+      ],
+      "mailingAddress": [
+        [
+          "MAILING_AD",
+          "MAILING_CI",
+          "MAILING_ST",
+          "MAILING_ZI"
+        ],
+        [
+          "MAILING__1",
+          "MAILING__2",
+          "MAILING__3",
+          "MAILING__4"
+        ]
+      ],
+      "acreage": [
+        "ACRES",
+        "LEGAL_ACRE",
+        "LEGAL_AC_1"
+      ],
+      "assessedValue": [
+        "SEV",
+        "TAXABLE",
+        "SEV_1"
+      ],
+      "landUse": [
+        "PROP_CLASS",
+        "PROP_CLA_1",
+        "ZONING",
+        "ZONING_1"
+      ],
+      "legalDescription": [
+        "LEGAL_DESC",
+        "LEGAL_DE_1"
+      ]
+    }
+  },
+  {
+    "sourceKey": "iron-mi-public",
+    "provider": "Iron County / Colligo public GIS",
+    "county": "Iron",
+    "state": "MI",
+    "sourceType": "colligo_public_layer",
+    "sourceUrl": "https://colligogis.com/desktop/#QrqmP6RYbHZ3DuVn",
+    "publicLink": "QrqmP6RYbHZ3DuVn",
+    "colligoLayerId": "1754422764",
+    "colligoUniqType": "poly1754422764",
+    "sourceProjection": "EPSG:2896",
+    "initialCenter": "-9850008.323810197,5807624.379179846",
+    "viewExtents": "-10100000,5500000,-9300000,6300000",
+    "sourceUpdatedAt": null,
+    "inputFile": "data/parcels/iron-mi-colligo.geojson",
+    "refreshCadence": "monthly metadata check; quarterly full refresh",
+    "lastRefreshReviewedAt": null,
+    "refreshNotes": "Private personal MVP import from county-linked Colligo public GIS. Verify county or Colligo terms before any commercial reuse.",
+    "notes": "Colligo geometry is EPSG:2896 and is transformed to WGS84; int_findTabData enriches parcel attributes by ogr_fid.",
+    "fieldMap": {
+      "sourceFeatureId": [
+        "ogr_fid",
+        "ogrID",
+        "pnum"
+      ],
+      "parcelId": [
+        "pnum"
+      ],
+      "apn": [
+        "pnum"
+      ],
+      "ownerName": [
+        "ownername1"
+      ],
+      "siteAddress": [
+        "PropAddress"
+      ],
+      "mailingAddress": [
+        [
+          "ownerstreetaddr",
+          "OwnerCSZ"
+        ],
+        "ownerstreetaddr"
+      ],
+      "acreage": [
+        "totalacres",
+        "RecordAcres"
+      ],
+      "assessedValue": [
+        "mborass",
+        "mborsev",
+        "SEV",
+        "AssessedValue",
+        "FinalTaxable",
+        "landass"
+      ],
+      "landUse": [
+        "propclass",
+        "Class"
+      ],
+      "legalDescription": [
+        "legal"
+      ]
+    }
+  },
+  {
+    "sourceKey": "alger-mi-colligo",
+    "provider": "Alger County / Colligo public GIS",
+    "county": "Alger",
+    "state": "MI",
+    "sourceType": "colligo_public_layer",
+    "sourceUrl": "https://colligogis.com/desktop/#sqpf5DSkqDPbsKy7",
+    "publicLink": "sqpf5DSkqDPbsKy7",
+    "colligoLayerId": "1612371098",
+    "colligoUniqType": "poly1612371098",
+    "sourceProjection": "EPSG:4326",
+    "initialCenter": "-9631171.24761584,5846064.782824822",
+    "viewExtents": "-10100000,5500000,-9300000,6300000",
+    "sourceUpdatedAt": null,
+    "inputFile": "data/parcels/alger-mi-colligo.geojson",
+    "refreshCadence": "monthly metadata check; quarterly full refresh",
+    "lastRefreshReviewedAt": null,
+    "refreshNotes": "Private personal MVP import from county-linked Colligo public GIS. Verify county or Colligo terms before any commercial reuse.",
+    "notes": "Colligo loadData geometry is WGS84; int_findTabData enriches parcel attributes by ogr_fid.",
+    "fieldMap": {
+      "sourceFeatureId": [
+        "ogr_fid",
+        "ogrID",
+        "pnum"
+      ],
+      "parcelId": [
+        "pnum"
+      ],
+      "apn": [
+        "pnum"
+      ],
+      "ownerName": [
+        "ownername1"
+      ],
+      "siteAddress": [
+        "propstreetcombined"
+      ],
+      "mailingAddress": [
+        [
+          "ownerstreetaddr",
+          "OwnerCSZ"
+        ],
+        "ownerstreetaddr"
+      ],
+      "acreage": [
+        "totalacres"
+      ],
+      "assessedValue": [
+        "mborass",
+        "mborsev",
+        "landass"
+      ],
+      "landUse": [
+        "propclass"
+      ],
+      "legalDescription": [
+        "legal"
+      ]
+    }
+  },
+  {
+    "sourceKey": "schoolcraft-mi-2024",
+    "provider": "Schoolcraft County public ArcGIS FeatureServer",
+    "county": "Schoolcraft",
+    "state": "MI",
+    "sourceType": "arcgis_feature_server",
+    "sourceUrl": "https://services.arcgis.com/edGXqVKidagzAIPB/arcgis/rest/services/SchoolcraftCountyParcels_Updated_20240830/FeatureServer/0",
+    "sourceUpdatedAt": "2024-08-30T00:00:00.000Z",
+    "inputFile": "data/parcels/schoolcraft-mi-2024.geojson",
+    "refreshCadence": "monthly metadata check; quarterly full refresh",
+    "lastRefreshReviewedAt": null,
+    "refreshNotes": "Private personal MVP import from a public Schoolcraft parcel FeatureServer. Verify county terms before any commercial reuse.",
+    "notes": "Public layer exposes parcel id, owner, mailing address, property class, and legal description fields.",
+    "fieldMap": {
+      "sourceFeatureId": [
+        "FID",
+        "GlobalID",
+        "Parcel_ID"
+      ],
+      "parcelId": [
+        "Parcel_ID"
+      ],
+      "apn": [
+        "Parcel_ID"
+      ],
+      "ownerName": [
+        "OwnerName"
+      ],
+      "siteAddress": [],
+      "mailingAddress": [
+        [
+          "OwnerAddre",
+          "OwnerCityS",
+          "OwnerCount"
+        ],
+        "OwnerAddre"
+      ],
+      "acreage": [],
+      "assessedValue": [],
+      "landUse": [
+        "PropClass"
+      ],
+      "legalDescription": [
+        "LegalDesri"
+      ]
+    }
+  },
+  {
+    "sourceKey": "dickinson-mi-colligo",
+    "provider": "Dickinson County / Colligo public GIS",
+    "county": "Dickinson",
+    "state": "MI",
+    "sourceType": "colligo_public_layer",
+    "sourceUrl": "https://colligogis.com/desktop/#TtaUDgsve5GjPgr6",
+    "publicLink": "TtaUDgsve5GjPgr6",
+    "colligoLayerId": "1608411986",
+    "colligoUniqType": "poly1608411986",
+    "sourceProjection": "EPSG:2896",
+    "initialCenter": "-9785033.954365155,5777763.32932412",
+    "viewExtents": "-10100000,5500000,-9300000,6300000",
+    "sourceUpdatedAt": null,
+    "inputFile": "data/parcels/dickinson-mi-colligo.geojson",
+    "refreshCadence": "monthly metadata check; quarterly full refresh",
+    "lastRefreshReviewedAt": null,
+    "refreshNotes": "Private personal MVP import from county-linked Colligo public GIS. Verify county or Colligo terms before any commercial reuse.",
+    "notes": "Colligo geometry is EPSG:2896 and is transformed to WGS84; int_findTabData enriches parcel attributes by ogr_fid.",
+    "fieldMap": {
+      "sourceFeatureId": [
+        "ogr_fid",
+        "ogrID",
+        "pnum"
+      ],
+      "parcelId": [
+        "pnum"
+      ],
+      "apn": [
+        "pnum"
+      ],
+      "ownerName": [
+        "ownername1"
+      ],
+      "siteAddress": [
+        "propstreetcombined"
+      ],
+      "mailingAddress": [
+        [
+          "ownerstreetaddr",
+          "OwnerCSZ"
+        ],
+        "ownerstreetaddr"
+      ],
+      "acreage": [
+        "totalacres"
+      ],
+      "assessedValue": [
+        "mborass",
+        "mborsev",
+        "landass"
+      ],
+      "landUse": [
+        "propclass"
+      ],
+      "legalDescription": [
+        "legal"
+      ]
+    }
+  },
+  {
+    "sourceKey": "delta-mi-fetchgis",
+    "provider": "Delta County / CUPPAD FetchGIS public ArcGIS proxy",
+    "county": "Delta",
+    "state": "MI",
+    "sourceType": "arcgis_feature_server",
+    "sourceUrl": "https://app.fetchgis.com/geoservices/fgis/cupParcelsDelta/FeatureServer/0",
+    "sourceFormat": "arcgis_json",
+    "sourceProjection": "EPSG:3857",
+    "proxyUrl": "https://app.fetchgis.com/proxy/ags/proxy.ashx?",
+    "requestReferer": "https://app.fetchgis.com/?currentMap=cuppad",
+    "outSR": null,
+    "pageSize": 1000,
+    "sourceUpdatedAt": null,
+    "inputFile": "data/parcels/delta-mi-fetchgis.geojson",
+    "refreshCadence": "monthly metadata check; quarterly full refresh",
+    "lastRefreshReviewedAt": null,
+    "refreshNotes": "Private personal MVP import from county-linked CUPPAD FetchGIS public parcel layer. Verify county, CUPPAD, or FetchGIS terms before any commercial reuse.",
+    "notes": "FetchGIS proxy returns ArcGIS JSON in Web Mercator. Public map layer exposes parcel id and geometry.",
+    "fieldMap": {
+      "sourceFeatureId": [
+        "GlobalID",
+        "OBJECTID",
+        "Parcel_PIN"
+      ],
+      "parcelId": [
+        "Parcel_PIN"
+      ],
+      "apn": [
+        "Parcel_PIN"
+      ],
+      "ownerName": [],
+      "siteAddress": [],
+      "mailingAddress": [],
+      "acreage": [],
+      "assessedValue": [],
+      "landUse": [],
+      "legalDescription": []
+    }
+  },
+  {
+    "sourceKey": "menominee-mi-colligo",
+    "provider": "Menominee County / Colligo public GIS",
+    "county": "Menominee",
+    "state": "MI",
+    "sourceType": "colligo_public_layer",
+    "sourceUrl": "https://colligogis.com/desktop/#ZmdxvcJUMXkUMiUH",
+    "publicLink": "ZmdxvcJUMXkUMiUH",
+    "colligoLayerId": "1606848402",
+    "colligoUniqType": "poly1606848402",
+    "sourceProjection": "EPSG:2896",
+    "initialCenter": "-9744701.164397387,5703303.966221821",
+    "viewExtents": "-10100000,5500000,-9300000,6300000",
+    "sourceUpdatedAt": null,
+    "inputFile": "data/parcels/menominee-mi-colligo.geojson",
+    "refreshCadence": "monthly metadata check; quarterly full refresh",
+    "lastRefreshReviewedAt": null,
+    "refreshNotes": "Private personal MVP import from county-linked Colligo public GIS. Verify county or Colligo terms before any commercial reuse.",
+    "notes": "Colligo geometry is EPSG:2896 and is transformed to WGS84; int_findTabData enriches parcel attributes by ogr_fid.",
+    "fieldMap": {
+      "sourceFeatureId": [
+        "ogr_fid",
+        "ogrID",
+        "parcel_num"
+      ],
+      "parcelId": [
+        "parcel_num"
+      ],
+      "apn": [
+        "parcel_num"
+      ],
+      "ownerName": [
+        "ownername1"
+      ],
+      "siteAddress": [
+        [
+          "propstreetcombined",
+          "propcity",
+          "propstate",
+          "propzip"
+        ],
+        "propstreetcombined"
+      ],
+      "mailingAddress": [
+        [
+          "ownerstreetaddr",
+          "OwnerCSZ"
+        ],
+        "ownerstreetaddr"
+      ],
+      "acreage": [
+        "totalacres"
+      ],
+      "assessedValue": [
+        "mborass",
+        "mborsev",
+        "landass"
+      ],
+      "landUse": [
+        "propclass"
+      ],
+      "legalDescription": [
+        "legal"
+      ]
+    }
+  }
+]
