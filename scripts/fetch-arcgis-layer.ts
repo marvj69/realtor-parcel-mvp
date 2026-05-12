@@ -25,6 +25,14 @@ type CountySource = {
   colligoEnrichProperties?: boolean;
   initialCenter?: string;
   viewExtents?: string;
+  mapguideSiteId?: string;
+  mapguideReturnUrl?: string;
+  mapguideAgentUrl?: string;
+  mapguideFeatureSource?: string;
+  mapguideClassName?: string;
+  mapguideGeometryProperty?: string;
+  mapguideUsernameEnv?: string;
+  mapguidePasswordEnv?: string;
 };
 
 type ArcgisJsonPayload = {
@@ -52,6 +60,10 @@ proj4.defs(
 proj4.defs(
   "EPSG:2896",
   "+proj=lcc +lat_0=44.7833333333333 +lon_0=-87 +lat_1=47.0833333333333 +lat_2=45.4833333333333 +x_0=7999999.999968 +y_0=0 +ellps=GRS80 +towgs84=-0.991,1.9072,0.5129,-1.25033e-07,-4.6785e-08,-5.6529e-08,0 +units=ft +no_defs +type=crs"
+);
+proj4.defs(
+  "EPSG:2251",
+  "+proj=lcc +lat_0=44.7833333333333 +lon_0=-87 +lat_1=47.0833333333333 +lat_2=45.4833333333333 +x_0=7999999.999968 +y_0=0 +ellps=GRS80 +units=ft +no_defs +type=crs"
 );
 proj4.defs(
   "ESRI:102688",
@@ -368,6 +380,272 @@ async function fetchColligoTableRows(source: CountySource, cookie: string): Prom
   return rows;
 }
 
+type CookieJar = Map<string, string>;
+
+function readSetCookies(headers: Headers): string[] {
+  const rawCookie = headers.get("set-cookie");
+  if (!rawCookie) return [];
+  return rawCookie.split(/,(?=\s*[^;,]+=[^;,]+)/).map((cookie) => cookie.split(";")[0]?.trim()).filter(Boolean);
+}
+
+function updateCookies(cookieJar: CookieJar, headers: Headers) {
+  for (const cookie of readSetCookies(headers)) {
+    const name = cookie.split("=")[0];
+    if (name) cookieJar.set(name, cookie);
+  }
+}
+
+function cookieHeader(cookieJar: CookieJar): string {
+  return Array.from(cookieJar.values()).join("; ");
+}
+
+function readInputValue(html: string, name: string): string {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return html.match(new RegExp(`name="${escapedName}"[^>]*value="([^"]*)"`))?.[1] ?? "";
+}
+
+function joinUrl(baseUrl: string, suffix: string): string {
+  return `${baseUrl.replace(/\/$/, "")}/${suffix.replace(/^\//, "")}`;
+}
+
+function firstArrayValue(value: unknown): unknown {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function collectMapguideFeatures(value: unknown, features: Array<Record<string, unknown>> = []): Array<Record<string, unknown>> {
+  if (!value || typeof value !== "object") return features;
+
+  if (Array.isArray(value)) {
+    for (const item of value) collectMapguideFeatures(item, features);
+    return features;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (Array.isArray(record.Feature)) {
+    for (const feature of record.Feature) {
+      if (feature && typeof feature === "object") features.push(feature as Record<string, unknown>);
+    }
+  }
+
+  for (const item of Object.values(record)) collectMapguideFeatures(item, features);
+  return features;
+}
+
+function mapguideProperties(feature: Record<string, unknown>): Record<string, unknown> {
+  const properties: Record<string, unknown> = {};
+  const rawProperties = feature.Property;
+  if (!Array.isArray(rawProperties)) return properties;
+
+  for (const property of rawProperties) {
+    if (!property || typeof property !== "object") continue;
+    const record = property as Record<string, unknown>;
+    const name = firstArrayValue(record.Name);
+    if (typeof name !== "string" || !name) continue;
+    properties[name] = firstArrayValue(record.Value) ?? null;
+  }
+
+  return properties;
+}
+
+function trimOuterParens(value: string): string {
+  const text = value.trim();
+  if (!text.startsWith("(") || !text.endsWith(")")) return text;
+
+  let depth = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === "(") depth += 1;
+    if (char === ")") depth -= 1;
+    if (depth === 0 && index < text.length - 1) return text;
+  }
+
+  return text.slice(1, -1).trim();
+}
+
+function splitParenthesizedGroups(value: string): string[] {
+  const groups: string[] = [];
+  let depth = 0;
+  let start = -1;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    if (char === "(") {
+      if (depth === 0) start = index;
+      depth += 1;
+    } else if (char === ")") {
+      depth -= 1;
+      if (depth === 0 && start >= 0) {
+        groups.push(value.slice(start, index + 1));
+        start = -1;
+      }
+    }
+  }
+
+  return groups;
+}
+
+function coordinatesFromText(value: string, sourceProjection: string | undefined): Position[] {
+  const coordinatePattern = /(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s+(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g;
+  const coordinates: Position[] = [];
+  for (const match of value.matchAll(coordinatePattern)) {
+    coordinates.push(transformPosition([Number(match[1]), Number(match[2])], sourceProjection));
+  }
+
+  return coordinates.length >= 3 ? closeRing(coordinates) : [];
+}
+
+function standardPolygonRings(value: string, sourceProjection: string | undefined): Position[][] {
+  const body = trimOuterParens(value);
+  const ringGroups = splitParenthesizedGroups(body);
+  const rawRings = ringGroups.length > 0 ? ringGroups : [body];
+  return rawRings
+    .map((ringText) => coordinatesFromText(ringText, sourceProjection))
+    .filter((ring) => ring.length >= 4);
+}
+
+function mapguideWktToGeoJson(wkt: string, sourceProjection: string | undefined): Polygon | MultiPolygon | null {
+  const trimmed = wkt.trim();
+  const type = trimmed.match(/^[A-Z]+/i)?.[0].toUpperCase();
+  const bodyStart = trimmed.indexOf("(");
+  if (!type || bodyStart < 0) return null;
+
+  const body = trimmed.slice(bodyStart);
+
+  if (type === "POLYGON") {
+    const rings = standardPolygonRings(body, sourceProjection);
+    return rings.length > 0 ? { type: "Polygon", coordinates: rings } : null;
+  }
+
+  if (type === "MULTIPOLYGON") {
+    const polygons = splitParenthesizedGroups(trimOuterParens(body))
+      .map((polygonText) => standardPolygonRings(polygonText, sourceProjection))
+      .filter((rings) => rings.length > 0);
+    if (polygons.length === 0) return null;
+    return polygons.length === 1
+      ? { type: "Polygon", coordinates: polygons[0] }
+      : { type: "MultiPolygon", coordinates: polygons };
+  }
+
+  if (type === "CURVEPOLYGON") {
+    const ring = coordinatesFromText(body, sourceProjection);
+    return ring.length >= 4 ? { type: "Polygon", coordinates: [ring] } : null;
+  }
+
+  if (type === "MULTICURVEPOLYGON") {
+    const polygonGroups = splitParenthesizedGroups(trimOuterParens(body));
+    const polygons = (polygonGroups.length > 0 ? polygonGroups : [body])
+      .map((polygonText) => coordinatesFromText(polygonText, sourceProjection))
+      .filter((ring) => ring.length >= 4)
+      .map((ring) => [ring]);
+    if (polygons.length === 0) return null;
+    return polygons.length === 1
+      ? { type: "Polygon", coordinates: polygons[0] }
+      : { type: "MultiPolygon", coordinates: polygons };
+  }
+
+  return null;
+}
+
+async function getMapguideSiteConfig(source: CountySource): Promise<Record<string, unknown>> {
+  if (!source.sourceUrl) throw new Error("sourceUrl is required for MapGuide sources");
+  if (!source.mapguideSiteId) throw new Error("mapguideSiteId is required for MapGuide sources");
+
+  const usernameEnv = source.mapguideUsernameEnv ?? "MAPGUIDE_USERNAME";
+  const passwordEnv = source.mapguidePasswordEnv ?? "MAPGUIDE_PASSWORD";
+  const username = process.env[usernameEnv];
+  const password = process.env[passwordEnv];
+  if (!username || !password) {
+    throw new Error(`Missing ${usernameEnv} or ${passwordEnv}. Use the public GIS credentials from the source page as local environment variables.`);
+  }
+
+  const cookieJar: CookieJar = new Map();
+  const returnUrl = source.mapguideReturnUrl ?? "%2fIntegrator%2f";
+  const loginUrl = joinUrl(source.sourceUrl, `Default.aspx?ReturnUrl=${returnUrl}`);
+  let response = await fetch(loginUrl, { redirect: "manual" });
+  updateCookies(cookieJar, response.headers);
+  if (!response.ok) throw new Error(`MapGuide login page failed: ${response.status} ${response.statusText}`);
+
+  const loginHtml = await response.text();
+  response = await fetch(loginUrl, {
+    method: "POST",
+    redirect: "manual",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      cookie: cookieHeader(cookieJar)
+    },
+    body: new URLSearchParams({
+      __VIEWSTATE: readInputValue(loginHtml, "__VIEWSTATE"),
+      __VIEWSTATEGENERATOR: readInputValue(loginHtml, "__VIEWSTATEGENERATOR"),
+      __EVENTVALIDATION: readInputValue(loginHtml, "__EVENTVALIDATION"),
+      IntegratorUserNameTextbox: username,
+      IntegratorPasswordTextbox: password,
+      LogInButton: "Log In"
+    })
+  });
+  updateCookies(cookieJar, response.headers);
+  if (![200, 302].includes(response.status)) throw new Error(`MapGuide login failed: ${response.status} ${response.statusText}`);
+
+  response = await fetch(joinUrl(source.sourceUrl, `Web/Default.aspx?server=mapguide&SiteId=${source.mapguideSiteId}&Version=3.3.1`), {
+    headers: { cookie: cookieHeader(cookieJar) }
+  });
+  updateCookies(cookieJar, response.headers);
+  if (!response.ok) throw new Error(`MapGuide site load failed: ${response.status} ${response.statusText}`);
+  await response.text();
+
+  response = await fetch(joinUrl(source.sourceUrl, "Web/Default.aspx/GetSiteConfigJSON"), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      cookie: cookieHeader(cookieJar)
+    },
+    body: "{}"
+  });
+  if (!response.ok) throw new Error(`MapGuide site config failed: ${response.status} ${response.statusText}`);
+
+  const payload = await response.json() as { d?: unknown };
+  if (!payload.d) throw new Error("MapGuide site config did not include a response body.");
+  return typeof payload.d === "string" ? JSON.parse(payload.d) as Record<string, unknown> : payload.d as Record<string, unknown>;
+}
+
+async function fetchMapguideSource(source: CountySource): Promise<FeatureCollection> {
+  if (!source.mapguideAgentUrl) throw new Error("mapguideAgentUrl is required for MapGuide sources");
+  if (!source.mapguideFeatureSource) throw new Error("mapguideFeatureSource is required for MapGuide sources");
+  if (!source.mapguideClassName) throw new Error("mapguideClassName is required for MapGuide sources");
+
+  const config = await getMapguideSiteConfig(source);
+  const general = config.general as Record<string, unknown> | undefined;
+  const sessionId = typeof general?.session_id === "string" ? general.session_id : null;
+  if (!sessionId) throw new Error("MapGuide site config did not include a session id.");
+
+  const url = new URL(source.mapguideAgentUrl);
+  url.searchParams.set("OPERATION", "SELECTFEATURES");
+  url.searchParams.set("VERSION", "1.0.0");
+  url.searchParams.set("SESSION", sessionId);
+  url.searchParams.set("RESOURCEID", source.mapguideFeatureSource);
+  url.searchParams.set("CLASSNAME", source.mapguideClassName);
+  url.searchParams.set("FORMAT", "application/json");
+  if (source.where) url.searchParams.set("FILTER", source.where);
+
+  console.log(`Fetching MapGuide layer ${source.mapguideClassName}`);
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`MapGuide feature request failed: ${response.status} ${response.statusText}`);
+
+  const payload = await response.json() as Record<string, unknown>;
+  const features = collectMapguideFeatures(payload.FeatureSet);
+  const geometryProperty = source.mapguideGeometryProperty ?? "ogr_geometry";
+
+  return {
+    type: "FeatureCollection",
+    features: features.flatMap((feature): Feature[] => {
+      const properties = mapguideProperties(feature);
+      const rawGeometry = properties[geometryProperty];
+      const geometry = typeof rawGeometry === "string" ? mapguideWktToGeoJson(rawGeometry, source.sourceProjection) : null;
+      if (!geometry) return [];
+      return [{ type: "Feature", properties, geometry }];
+    })
+  };
+}
+
 async function main() {
   const source = getConfig();
   const outputPath = path.resolve(process.cwd(), source.inputFile);
@@ -377,6 +655,8 @@ async function main() {
   const featureCollection =
     source.sourceType === "colligo_public_layer"
       ? await fetchColligoSource(source)
+      : source.sourceType === "mapguide_public_layer"
+        ? await fetchMapguideSource(source)
       : await fetchArcgisSource(source);
 
   fs.writeFileSync(outputPath, JSON.stringify(featureCollection, null, 2));

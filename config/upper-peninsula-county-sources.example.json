@@ -298,6 +298,50 @@
     }
   },
   {
+    "sourceKey": "marquette-city-mi-public",
+    "provider": "Marquette County public ArcGIS FeatureServer",
+    "county": "Marquette",
+    "state": "MI",
+    "sourceType": "arcgis_feature_server",
+    "sourceUrl": "https://services9.arcgis.com/6EuFgO4fLTqfNOhu/ArcGIS/rest/services/MarquetteParcelData/FeatureServer/2",
+    "where": "lower(city) = 'marquette'",
+    "sourceUpdatedAt": null,
+    "inputFile": "data/parcels/marquette-city-mi-public.geojson",
+    "refreshCadence": "monthly metadata check; quarterly full refresh",
+    "lastRefreshReviewedAt": null,
+    "refreshNotes": "Supplemental public ArcGIS layer used to fill Marquette city-center parcel coverage gaps in the county FetchGIS layer. Verify county layer terms before commercial reuse.",
+    "notes": "This city-filtered public layer exposes parcel geometry, site address, city, ZIP, and land-use class, but not owner/APN details.",
+    "fieldMap": {
+      "sourceFeatureId": [
+        "ll_uuid",
+        "FID"
+      ],
+      "parcelId": [
+        "ll_uuid",
+        "FID"
+      ],
+      "apn": [],
+      "ownerName": [],
+      "siteAddress": [
+        [
+          "address",
+          "city",
+          "state2",
+          "szip"
+        ],
+        "address",
+        "saddstr"
+      ],
+      "mailingAddress": [],
+      "acreage": [],
+      "assessedValue": [],
+      "landUse": [
+        "UseClass"
+      ],
+      "legalDescription": []
+    }
+  },
+  {
     "sourceKey": "iron-mi-public",
     "provider": "Iron County / Colligo public GIS",
     "county": "Iron",
@@ -567,6 +611,63 @@
       "assessedValue": [],
       "landUse": [],
       "legalDescription": []
+    }
+  },
+  {
+    "sourceKey": "escanaba-mi-public-mapguide",
+    "provider": "City of Escanaba public GIS / mPower MapGuide",
+    "county": "Delta",
+    "state": "MI",
+    "sourceType": "mapguide_public_layer",
+    "sourceUrl": "https://gis.escanaba.org/Integrator",
+    "mapguideSiteId": "6a5368ed-1969-4865-bfbf-4c9e30f25cb3",
+    "mapguideReturnUrl": "%2fIntegrator%2f",
+    "mapguideAgentUrl": "https://GIS.escanaba.org/mapguide/mapagent/mapagent.fcgi",
+    "mapguideFeatureSource": "Library://EscanabaGIS/Data/EscanabaSQL.FeatureSource",
+    "mapguideClassName": "dbo:parcels",
+    "mapguideGeometryProperty": "ogr_geometry",
+    "mapguideUsernameEnv": "ESCANABA_GIS_USERNAME",
+    "mapguidePasswordEnv": "ESCANABA_GIS_PASSWORD",
+    "sourceProjection": "EPSG:2251",
+    "sourceUpdatedAt": null,
+    "inputFile": "data/parcels/escanaba-mi-public-mapguide.geojson",
+    "refreshCadence": "monthly metadata check; quarterly full refresh",
+    "lastRefreshReviewedAt": null,
+    "refreshNotes": "Supplemental public city GIS layer used to fill Escanaba city-center parcel coverage gaps in the Delta County/CUPPAD FetchGIS layer. The public source page lists guest access credentials; keep them in local env rather than committing them.",
+    "notes": "City GIS page: https://www.escanaba.org/engineering/page/escanaba-city-geographic-information-system-gis. Public disclaimer says the information is unofficial and not guaranteed/certified. Geometry is MapGuide WKT in Michigan state-plane feet and is transformed to WGS84.",
+    "fieldMap": {
+      "sourceFeatureId": [
+        "ogr_fid",
+        "pin"
+      ],
+      "parcelId": [
+        "pin"
+      ],
+      "apn": [
+        "pin"
+      ],
+      "ownerName": [],
+      "siteAddress": [
+        [
+          "PhysAddressCombo",
+          "PhysCity",
+          "PhysState",
+          "PhysZip"
+        ],
+        "PhysAddressCombo"
+      ],
+      "mailingAddress": [],
+      "acreage": [
+        "acreage"
+      ],
+      "assessedValue": [],
+      "landUse": [
+        "zoning"
+      ],
+      "legalDescription": [
+        "legal",
+        "legal_2"
+      ]
     }
   },
   {

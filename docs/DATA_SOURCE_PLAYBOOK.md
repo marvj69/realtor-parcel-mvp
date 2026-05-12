@@ -76,6 +76,11 @@ The committed Upper Peninsula source starter lives at
 `config/upper-peninsula-county-sources.example.json`. Use it with `--config=...`
 when fetching or importing those public county layers.
 
+MapGuide/mPower public GIS sources may require public guest credentials from the
+source agency page. Keep those credentials in local environment variables named
+by the source config, such as `ESCANABA_GIS_USERNAME` and
+`ESCANABA_GIS_PASSWORD`, and do not commit them.
+
 For sources that split a value across several fields, put a nested array in the
 candidate list. The importer will concatenate the first nested group with data,
 which keeps county-specific address weirdness in config instead of code:

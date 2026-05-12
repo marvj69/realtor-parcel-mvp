@@ -61,7 +61,11 @@ async function lookupParcel(request: Request) {
       CROSS JOIN click_point cp
       LEFT JOIN parcel_sources s ON s.source_key = p.source_key
       WHERE ST_Intersects(p.geom, cp.geom)
-      ORDER BY ST_Area(p.geom::geography) ASC
+      ORDER BY
+        CASE WHEN p.owner_name IS NOT NULL THEN 0 ELSE 1 END,
+        CASE WHEN p.apn IS NOT NULL OR p.parcel_id IS NOT NULL THEN 0 ELSE 1 END,
+        CASE WHEN p.site_address IS NOT NULL THEN 0 ELSE 1 END,
+        ST_Area(p.geom::geography) ASC
       LIMIT 1
       `,
       [lng, lat]
