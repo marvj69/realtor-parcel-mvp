@@ -130,13 +130,16 @@ function setGeoJsonSourceData(
   if (source) source.setData(data);
 }
 
-function hasSelectableParcelAtPoint(map: maplibregl.Map, point: maplibregl.PointLike) {
+function getSelectableParcelAtPoint(map: maplibregl.Map, point: maplibregl.PointLike) {
   const parcelLayerIds = [PARCEL_TILE_FILL_LAYER_ID, PARCEL_GEOJSON_FILL_LAYER_ID].filter((layerId) =>
     Boolean(map.getLayer(layerId))
   );
 
-  if (parcelLayerIds.length === 0) return false;
-  return map.queryRenderedFeatures(point, { layers: parcelLayerIds }).length > 0;
+  if (parcelLayerIds.length === 0) return { hasFeature: false, parcelId: null };
+
+  const features = map.queryRenderedFeatures(point, { layers: parcelLayerIds });
+  const parcelId = features.find((feature) => typeof feature.properties?.id === "string")?.properties?.id ?? null;
+  return { hasFeature: features.length > 0, parcelId };
 }
 
 function setMeasurementSourceData(
@@ -379,6 +382,7 @@ export default function ParcelMap() {
   const basemapModeRef = useRef<BasemapMode>("streets");
   const activePanelRef = useRef<AppPanel>("map");
   const measurementModeRef = useRef<MeasurementMode>("distance");
+  const selectedParcelRef = useRef<ParcelFeature | null>(null);
   const [selectedParcel, setSelectedParcel] = useState<ParcelFeature | null>(null);
   const [activePanel, setActivePanel] = useState<AppPanel>("map");
   const [basemapMode, setBasemapMode] = useState<BasemapMode>("streets");
@@ -403,6 +407,11 @@ export default function ParcelMap() {
   const [signupPassword, setSignupPassword] = useState("");
   const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
+
+  function setSelectedParcelState(nextParcel: ParcelFeature | null) {
+    selectedParcelRef.current = nextParcel;
+    setSelectedParcel(nextParcel);
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -579,7 +588,7 @@ export default function ParcelMap() {
     }
 
     function setSelectedParcelFeature(nextParcel: ParcelFeature | null) {
-      setSelectedParcel(nextParcel);
+      setSelectedParcelState(nextParcel);
       if (nextParcel) setActivePanel("details");
       setGeoJsonSourceData(
         map,
@@ -604,7 +613,14 @@ export default function ParcelMap() {
           throw new Error(payload.error ?? "Unable to look up parcel");
         }
 
-        setSelectedParcelFeature(payload.data ?? null);
+        const nextParcel = payload.data ?? null;
+        if (nextParcel && nextParcel.properties.id === selectedParcelRef.current?.properties.id) {
+          setSelectedParcelFeature(null);
+          setStatusMessage("Parcel unselected.");
+          return;
+        }
+
+        setSelectedParcelFeature(nextParcel);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unable to look up parcel");
       }
@@ -798,8 +814,15 @@ export default function ParcelMap() {
         return;
       }
 
-      if (!hasSelectableParcelAtPoint(map, event.point)) {
+      const clickedParcel = getSelectableParcelAtPoint(map, event.point);
+      if (!clickedParcel.hasFeature) {
         setStatusMessage("Click a visible parcel outline to select it.");
+        return;
+      }
+
+      if (clickedParcel.parcelId && clickedParcel.parcelId === selectedParcelRef.current?.properties.id) {
+        setSelectedParcelFeature(null);
+        setStatusMessage("Parcel unselected.");
         return;
       }
 
@@ -917,7 +940,7 @@ export default function ParcelMap() {
       if (!response.ok || !payload.ok) throw new Error(payload.error ?? "Unable to load selected parcel");
 
       const nextParcel = payload.data ?? null;
-      setSelectedParcel(nextParcel);
+      setSelectedParcelState(nextParcel);
       if (nextParcel) setActivePanel("details");
       const selectedSource = map?.getSource("selected-parcel") as maplibregl.GeoJSONSource | undefined;
       selectedSource?.setData(
