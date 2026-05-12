@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import zlib from "node:zlib";
 import { Client } from "pg";
 import type { Feature, FeatureCollection, Geometry, MultiPolygon, Polygon } from "geojson";
 import { getDatabaseConnectionString, loadEnv } from "./load-env";
@@ -40,7 +41,7 @@ type ParcelImportRecord = {
   assessedValue: number | null;
   landUse: string | null;
   legalDescription: string | null;
-  raw: string;
+  rawAttributesGzip: Buffer;
   geometry: string;
 };
 
@@ -140,6 +141,10 @@ function asNumber(value: string | number | null): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function gzipJson(value: unknown): Buffer {
+  return zlib.gzipSync(Buffer.from(JSON.stringify(value), "utf8"), { level: 9 });
+}
+
 function toMultiPolygonGeometry(geometry: Geometry | null): Polygon | MultiPolygon | null {
   if (!geometry) return null;
   if (geometry.type === "Polygon" || geometry.type === "MultiPolygon") return geometry;
@@ -170,7 +175,7 @@ async function insertParcelBatch(client: Client, records: ParcelImportRecord[]) 
       record.assessedValue,
       record.landUse,
       record.legalDescription,
-      record.raw,
+      record.rawAttributesGzip,
       record.geometry
     );
 
@@ -180,7 +185,7 @@ async function insertParcelBatch(client: Client, records: ParcelImportRecord[]) 
     return `(
       ${placeholders[0]}, ${placeholders[1]}, ${placeholders[2]}, ${placeholders[3]}, ${placeholders[4]},
       ${placeholders[5]}, ${placeholders[6]}, ${placeholders[7]}, ${placeholders[8]}, ${placeholders[9]},
-      ${placeholders[10]}, ${placeholders[11]}, ${placeholders[12]}, ${placeholders[13]}, ${placeholders[14]}::jsonb,
+      ${placeholders[10]}, ${placeholders[11]}, ${placeholders[12]}, ${placeholders[13]}, ${placeholders[14]}::bytea,
       ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON(${placeholders[15]}), 4326))
     )`;
   });
@@ -202,7 +207,7 @@ async function insertParcelBatch(client: Client, records: ParcelImportRecord[]) 
       assessed_value,
       land_use,
       legal_description,
-      raw,
+      raw_attributes_gzip,
       geom
     ) VALUES ${values.join(",")}
     ON CONFLICT (source_key, source_feature_id)
@@ -219,7 +224,7 @@ async function insertParcelBatch(client: Client, records: ParcelImportRecord[]) 
       assessed_value = EXCLUDED.assessed_value,
       land_use = EXCLUDED.land_use,
       legal_description = EXCLUDED.legal_description,
-      raw = EXCLUDED.raw,
+      raw_attributes_gzip = EXCLUDED.raw_attributes_gzip,
       geom = EXCLUDED.geom
     `,
     params
@@ -327,7 +332,7 @@ async function main() {
         assessedValue,
         landUse,
         legalDescription,
-        raw: JSON.stringify(properties),
+        rawAttributesGzip: gzipJson(properties),
         geometry: JSON.stringify(geometry)
       });
       imported += 1;

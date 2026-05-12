@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "db:schema": "tsx scripts/apply-schema.ts db/schema.sql",
+    "db:compact": "tsx scripts/compact-parcel-storage.ts",
     "db:seed": "tsx scripts/apply-schema.ts db/seed.sql",
     "parcels:fetch": "tsx scripts/fetch-arcgis-layer.ts",
     "parcels:import": "tsx scripts/import-parcels-from-geojson.ts"

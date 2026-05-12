@@ -67,7 +67,8 @@ Show fields when available:
 - Import GeoJSON FeatureCollections into PostGIS.
 - Support ArcGIS FeatureServer fetch when available.
 - Normalize county-specific field names.
-- Store raw source properties.
+- Store raw source properties. Fresh imports use gzipped JSON bytes to preserve
+  audit data without adding bulky duplicate JSONB for new parcel rows.
 
 ## Non-goals for v1
 

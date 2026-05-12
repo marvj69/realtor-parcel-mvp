@@ -43,7 +43,7 @@ INSERT INTO parcels (
   assessed_value,
   land_use,
   legal_description,
-  raw,
+  raw_attributes_gzip,
   geom
 )
 VALUES (
@@ -61,7 +61,7 @@ VALUES (
   85000,
   'Residential vacant',
   'Fictional legal description for app testing.',
-  '{"demo": true}'::jsonb,
+  decode('1f8b0800000000000213ab564a49cdcd57b22a292a4dad05001624c4810d000000', 'hex'),
   ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON('{"type":"Polygon","coordinates":[[[-88.5740,47.1240],[-88.5680,47.1240],[-88.5680,47.1200],[-88.5740,47.1200],[-88.5740,47.1240]]]}'), 4326))
 )
 ON CONFLICT (source_key, source_feature_id) DO UPDATE SET
@@ -71,7 +71,7 @@ ON CONFLICT (source_key, source_feature_id) DO UPDATE SET
   acreage = EXCLUDED.acreage,
   assessed_value = EXCLUDED.assessed_value,
   land_use = EXCLUDED.land_use,
-  raw = EXCLUDED.raw,
+  raw_attributes_gzip = EXCLUDED.raw_attributes_gzip,
   geom = EXCLUDED.geom;
 
 INSERT INTO projects (owner_user_id, user_label, name, client_name, description)

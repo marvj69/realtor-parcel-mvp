@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS parcels (
   assessed_value numeric,
   land_use text,
   legal_description text,
-  raw jsonb NOT NULL DEFAULT '{}'::jsonb,
+  raw_attributes_gzip bytea NOT NULL DEFAULT decode('1f8b0800000000000213abae050043bfa6a302000000', 'hex'),
   geom geometry(MultiPolygon, 4326) NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
@@ -42,27 +42,24 @@ CREATE TABLE IF NOT EXISTS parcels (
 );
 
 CREATE INDEX IF NOT EXISTS parcels_geom_gist_idx ON parcels USING gist (geom);
-CREATE INDEX IF NOT EXISTS parcels_source_key_idx ON parcels (source_key);
-CREATE INDEX IF NOT EXISTS parcels_apn_idx ON parcels (apn);
-CREATE INDEX IF NOT EXISTS parcels_parcel_id_idx ON parcels (parcel_id);
-CREATE INDEX IF NOT EXISTS parcels_owner_name_idx ON parcels (owner_name);
-CREATE INDEX IF NOT EXISTS parcels_site_address_idx ON parcels (site_address);
 CREATE INDEX IF NOT EXISTS parcels_parcel_id_trgm_idx ON parcels USING gin (parcel_id gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS parcels_apn_trgm_idx ON parcels USING gin (apn gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS parcels_owner_name_trgm_idx ON parcels USING gin (owner_name gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS parcels_site_address_trgm_idx ON parcels USING gin (site_address gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS parcels_mailing_address_trgm_idx ON parcels USING gin (mailing_address gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS parcels_text_search_idx ON parcels USING gin (
-  to_tsvector(
-    'simple',
-    coalesce(parcel_id, '') || ' ' ||
-    coalesce(apn, '') || ' ' ||
-    coalesce(owner_name, '') || ' ' ||
-    coalesce(site_address, '') || ' ' ||
-    coalesce(mailing_address, '') || ' ' ||
-    coalesce(land_use, '')
-  )
-);
+
+ALTER TABLE parcels ADD COLUMN IF NOT EXISTS raw_attributes_gzip bytea;
+ALTER TABLE parcels
+  ALTER COLUMN raw_attributes_gzip SET DEFAULT decode('1f8b0800000000000213abae050043bfa6a302000000', 'hex');
+COMMENT ON COLUMN parcels.raw_attributes_gzip IS
+  'Gzipped UTF-8 JSON text containing the original public-source parcel attributes.';
+
+DROP INDEX IF EXISTS parcels_source_key_idx;
+DROP INDEX IF EXISTS parcels_apn_idx;
+DROP INDEX IF EXISTS parcels_parcel_id_idx;
+DROP INDEX IF EXISTS parcels_owner_name_idx;
+DROP INDEX IF EXISTS parcels_site_address_idx;
+DROP INDEX IF EXISTS parcels_text_search_idx;
 
 CREATE TABLE IF NOT EXISTS app_users (
   id text PRIMARY KEY,

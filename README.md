@@ -142,6 +142,23 @@ Use the manual cadence and runbook in `docs/DATA_REFRESH_SCHEDULE.md` before
 refreshing production parcel data. Do not enable automated data-source refreshes
 until import-job logging and failure reporting are in place.
 
+## Compact Neon parcel storage
+
+Parcel imports preserve source attributes as gzipped JSON bytes so parcel details,
+search, lookup, tiles, and future audits keep the same information with less
+database storage. After upgrading an older database that still has legacy raw
+JSONB storage, run:
+
+```bash
+npm run db:compact
+```
+
+The compaction script preserves parcel row counts by source, validates the
+parcel count after the change, removes unused parcel indexes, and rebuilds the
+indexes used by map lookup, vector tiles, and search. When the database has
+enough free headroom, pass `-- --rewriteRaw` to rewrite an older parcel table so
+legacy raw JSONB is replaced by compressed raw attributes.
+
 ## Important implementation notes
 
 - Parcel boundaries are approximate public-record/GIS boundaries, not surveys.

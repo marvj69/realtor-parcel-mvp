@@ -55,7 +55,10 @@ import-job logging exists.
 
 ## Field normalization
 
-Every county may use different attribute names.
+Every county may use different attribute names. Fresh imports keep the original
+source attributes as gzipped JSON bytes in `parcels.raw_attributes_gzip`, while
+mapped fields such as parcel ID, owner, address, acreage, and land use stay in
+normal columns for the app and search.
 
 Examples:
 
