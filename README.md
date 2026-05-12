@@ -84,8 +84,13 @@ DATABASE_URL="postgresql://..."
 
 For Vercel, use the pooled Neon connection string for runtime usage. If you add `DATABASE_DIRECT_URL`, use it only for scripts/migrations.
 
-Satellite view defaults to the no-key USGS ImageryOnly raster service. Override
-`NEXT_PUBLIC_SATELLITE_TILE_URL` if you prefer a different authorized public tile source.
+Satellite view defaults to no-key USGS ImageryOnly raster services. The cached
+tile layer handles normal zooms, and a WMS detail layer takes over when zoomed
+in so imagery does not have to stretch z16 tiles. Override
+`NEXT_PUBLIC_SATELLITE_TILE_URL` or `NEXT_PUBLIC_SATELLITE_DETAIL_TILE_URL` if
+you prefer a different authorized public tile source. Set
+`NEXT_PUBLIC_SATELLITE_DETAIL_TILE_URL` to an empty string to disable the
+high-zoom detail layer.
 
 Optional private-app auth is controlled by server-only env vars. Set `APP_AUTH_PASSWORD` and
 `APP_AUTH_SESSION_SECRET` in Vercel to require a signed session cookie for saved projects/parcels.

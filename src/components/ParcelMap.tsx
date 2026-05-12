@@ -22,6 +22,9 @@ const PARCEL_TILE_SOURCE_ID = "parcel-tiles";
 const PARCEL_TILE_SOURCE_LAYER = "parcels";
 const SATELLITE_SOURCE_ID = "usgs-satellite";
 const SATELLITE_LAYER_ID = "usgs-satellite-layer";
+const SATELLITE_DETAIL_SOURCE_ID = "usgs-satellite-detail";
+const SATELLITE_DETAIL_LAYER_ID = "usgs-satellite-detail-layer";
+const SATELLITE_LAYER_IDS = [SATELLITE_LAYER_ID, SATELLITE_DETAIL_LAYER_ID];
 const PARCEL_TILE_FILL_LAYER_ID = "parcel-tile-fill";
 const PARCEL_TILE_LINE_LAYER_ID = "parcel-tile-line";
 const PARCEL_GEOJSON_FILL_LAYER_ID = "parcel-fill";
@@ -35,6 +38,11 @@ const STREET_PARCEL_LINE_COLOR = "#1d4ed8";
 const SATELLITE_PARCEL_LINE_COLOR = "#ff7a00";
 const STREET_SELECTED_PARCEL_LINE_COLOR = "#ea580c";
 const SATELLITE_SELECTED_PARCEL_LINE_COLOR = "#ff9f1c";
+const DEFAULT_SATELLITE_TILE_URL =
+  "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}";
+const DEFAULT_SATELLITE_DETAIL_TILE_URL =
+  "https://basemap.nationalmap.gov/arcgis/services/USGSImageryOnly/MapServer/WMSServer?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=0&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=512&HEIGHT=512&FORMAT=image/jpeg";
+const DEFAULT_SATELLITE_ATTRIBUTION = "USDA, USGS The National Map: Orthoimagery";
 const SELECTED_PARCEL_TOP_PADDING = 76;
 const SELECTED_PARCEL_SIDE_PADDING = 24;
 const SELECTED_PARCEL_BOTTOM_MARGIN = 36;
@@ -101,14 +109,18 @@ function getMapConfig() {
   const [lngRaw, latRaw] = centerRaw.split(",");
   const lng = Number(lngRaw);
   const lat = Number(latRaw);
+  const satelliteDetailTileUrlEnv = process.env.NEXT_PUBLIC_SATELLITE_DETAIL_TILE_URL;
+  const satelliteDetailMinZoom = Number(process.env.NEXT_PUBLIC_SATELLITE_DETAIL_MIN_ZOOM ?? 16);
+  const satelliteDetailMaxZoom = Number(process.env.NEXT_PUBLIC_SATELLITE_DETAIL_MAX_ZOOM ?? 19);
 
   return {
     styleUrl: process.env.NEXT_PUBLIC_MAP_STYLE_URL ?? "https://tiles.openfreemap.org/styles/liberty",
-    satelliteTileUrl:
-      process.env.NEXT_PUBLIC_SATELLITE_TILE_URL ??
-      "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}",
-    satelliteAttribution:
-      process.env.NEXT_PUBLIC_SATELLITE_ATTRIBUTION ?? "USDA, USGS The National Map: Orthoimagery",
+    satelliteTileUrl: process.env.NEXT_PUBLIC_SATELLITE_TILE_URL ?? DEFAULT_SATELLITE_TILE_URL,
+    satelliteDetailTileUrl:
+      satelliteDetailTileUrlEnv === "" ? null : satelliteDetailTileUrlEnv ?? DEFAULT_SATELLITE_DETAIL_TILE_URL,
+    satelliteDetailMinZoom: Number.isFinite(satelliteDetailMinZoom) ? satelliteDetailMinZoom : 16,
+    satelliteDetailMaxZoom: Number.isFinite(satelliteDetailMaxZoom) ? satelliteDetailMaxZoom : 19,
+    satelliteAttribution: process.env.NEXT_PUBLIC_SATELLITE_ATTRIBUTION ?? DEFAULT_SATELLITE_ATTRIBUTION,
     center: [Number.isFinite(lng) ? lng : -88.569, Number.isFinite(lat) ? lat : 47.1211] as [number, number],
     zoom: Number(process.env.NEXT_PUBLIC_DEFAULT_ZOOM ?? 13)
   };
@@ -447,7 +459,11 @@ export default function ParcelMap() {
     const map = mapRef.current;
     if (!map?.getLayer(SATELLITE_LAYER_ID)) return;
 
-    map.setLayoutProperty(SATELLITE_LAYER_ID, "visibility", basemapMode === "satellite" ? "visible" : "none");
+    for (const layerId of SATELLITE_LAYER_IDS) {
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, "visibility", basemapMode === "satellite" ? "visible" : "none");
+      }
+    }
     setParcelBoundaryPaint(map, basemapMode, getParcelLayerConfig().minZoom);
   }, [basemapMode]);
 
@@ -646,6 +662,33 @@ export default function ParcelMap() {
           "raster-opacity": 1
         }
       });
+
+      if (config.satelliteDetailTileUrl) {
+        const detailMinZoom = Math.max(0, config.satelliteDetailMinZoom);
+        const detailMaxZoom = Math.max(detailMinZoom, config.satelliteDetailMaxZoom);
+
+        map.addSource(SATELLITE_DETAIL_SOURCE_ID, {
+          type: "raster",
+          tiles: [config.satelliteDetailTileUrl],
+          tileSize: 512,
+          minzoom: detailMinZoom,
+          maxzoom: detailMaxZoom,
+          attribution: config.satelliteAttribution
+        });
+
+        map.addLayer({
+          id: SATELLITE_DETAIL_LAYER_ID,
+          type: "raster",
+          source: SATELLITE_DETAIL_SOURCE_ID,
+          minzoom: detailMinZoom,
+          layout: {
+            visibility: basemapModeRef.current === "satellite" ? "visible" : "none"
+          },
+          paint: {
+            "raster-opacity": ["interpolate", ["linear"], ["zoom"], detailMinZoom, 0, detailMinZoom + 0.75, 1]
+          }
+        });
+      }
 
       map.addSource("parcels", {
         type: "geojson",

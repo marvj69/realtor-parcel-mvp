@@ -11,6 +11,11 @@
 | `DATABASE_URL` | Yes for production | Vercel + local `.env.local` | Neon pooled Postgres connection string for server-side API routes. Never expose this in client code. |
 | `DATABASE_DIRECT_URL` | Optional | Local/import only | Direct Neon connection string for migrations/import scripts when needed. Do not set as a public var. |
 | `NEXT_PUBLIC_MAP_STYLE_URL` | Yes | Vercel + local `.env.local` | Public MapLibre style URL. Defaults to OpenFreeMap. |
+| `NEXT_PUBLIC_SATELLITE_TILE_URL` | Optional | Vercel + local `.env.local` | Public raster satellite/aerial tile template. Defaults to USGS ImageryOnly cached tiles. |
+| `NEXT_PUBLIC_SATELLITE_DETAIL_TILE_URL` | Optional | Vercel + local `.env.local` | Public high-zoom satellite/aerial tile template. Defaults to USGS ImageryOnly WMS with `{bbox-epsg-3857}`. Set to an empty string to disable. |
+| `NEXT_PUBLIC_SATELLITE_DETAIL_MIN_ZOOM` | Optional | Vercel + local `.env.local` | Zoom where the high-detail satellite layer fades in. Defaults to `16`. |
+| `NEXT_PUBLIC_SATELLITE_DETAIL_MAX_ZOOM` | Optional | Vercel + local `.env.local` | Maximum source zoom for the high-detail satellite layer. Defaults to `19`. |
+| `NEXT_PUBLIC_SATELLITE_ATTRIBUTION` | Optional | Vercel + local `.env.local` | Public attribution text for satellite/aerial imagery. |
 | `NEXT_PUBLIC_DEFAULT_CENTER` | Yes | Vercel + local `.env.local` | `longitude,latitude` default map center. |
 | `NEXT_PUBLIC_DEFAULT_ZOOM` | Yes | Vercel + local `.env.local` | Default map zoom. |
 | `NEXT_PUBLIC_PARCEL_MIN_ZOOM` | Yes | Vercel + local `.env.local` | Client-side threshold before loading parcel outlines. |
