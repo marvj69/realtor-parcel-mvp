@@ -38,6 +38,10 @@ const STREET_PARCEL_LINE_COLOR = "#1d4ed8";
 const SATELLITE_PARCEL_LINE_COLOR = "#ff7a00";
 const STREET_SELECTED_PARCEL_LINE_COLOR = "#ea580c";
 const SATELLITE_SELECTED_PARCEL_LINE_COLOR = "#ff9f1c";
+const OPENFREEMAP_STYLE_PREFIX = "https://tiles.openfreemap.org/styles/";
+const DEFAULT_STREET_TILE_URL =
+  "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}";
+const DEFAULT_STREET_ATTRIBUTION = "USGS The National Map: US Topo";
 const DEFAULT_SATELLITE_TILE_URL =
   "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}";
 const DEFAULT_SATELLITE_DETAIL_TILE_URL =
@@ -54,6 +58,7 @@ type MeasurementFeatureProperties = {
 };
 
 type BasemapMode = "streets" | "satellite";
+type MapStyleConfig = string | maplibregl.StyleSpecification;
 type NumberInterpolateExpression = ["interpolate", ["linear"], ["zoom"], number, number, number, number];
 
 function GlobeIcon() {
@@ -104,6 +109,34 @@ function setParcelBoundaryPaint(map: maplibregl.Map, basemapMode: BasemapMode, m
   }
 }
 
+function getStreetMapStyle(styleUrl: string | undefined): MapStyleConfig {
+  const trimmedStyleUrl = styleUrl?.trim();
+
+  if (trimmedStyleUrl && !trimmedStyleUrl.startsWith(OPENFREEMAP_STYLE_PREFIX)) {
+    return trimmedStyleUrl;
+  }
+
+  return {
+    version: 8,
+    sources: {
+      "usgs-topo": {
+        type: "raster",
+        tiles: [DEFAULT_STREET_TILE_URL],
+        tileSize: 256,
+        maxzoom: 16,
+        attribution: DEFAULT_STREET_ATTRIBUTION
+      }
+    },
+    layers: [
+      {
+        id: "usgs-topo",
+        type: "raster",
+        source: "usgs-topo"
+      }
+    ]
+  };
+}
+
 function getMapConfig() {
   const centerRaw = process.env.NEXT_PUBLIC_DEFAULT_CENTER ?? "-88.5690,47.1211";
   const [lngRaw, latRaw] = centerRaw.split(",");
@@ -114,7 +147,7 @@ function getMapConfig() {
   const satelliteDetailMaxZoom = Number(process.env.NEXT_PUBLIC_SATELLITE_DETAIL_MAX_ZOOM ?? 19);
 
   return {
-    styleUrl: process.env.NEXT_PUBLIC_MAP_STYLE_URL ?? "https://tiles.openfreemap.org/styles/liberty",
+    style: getStreetMapStyle(process.env.NEXT_PUBLIC_MAP_STYLE_URL),
     satelliteTileUrl: process.env.NEXT_PUBLIC_SATELLITE_TILE_URL ?? DEFAULT_SATELLITE_TILE_URL,
     satelliteDetailTileUrl:
       satelliteDetailTileUrlEnv === "" ? null : satelliteDetailTileUrlEnv ?? DEFAULT_SATELLITE_DETAIL_TILE_URL,
@@ -512,7 +545,7 @@ export default function ParcelMap() {
     const config = getMapConfig();
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: config.styleUrl,
+      style: config.style,
       center: config.center,
       zoom: config.zoom,
       attributionControl: {

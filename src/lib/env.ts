@@ -39,7 +39,7 @@ export function getPublicMapConfig() {
   const lat = Number(latRaw);
 
   return {
-    styleUrl: process.env.NEXT_PUBLIC_MAP_STYLE_URL ?? "https://tiles.openfreemap.org/styles/liberty",
+    styleUrl: process.env.NEXT_PUBLIC_MAP_STYLE_URL?.trim() || null,
     center: [Number.isFinite(lng) ? lng : -88.569, Number.isFinite(lat) ? lat : 47.1211] as [number, number],
     zoom: getNumberEnv("NEXT_PUBLIC_DEFAULT_ZOOM", 13)
   };

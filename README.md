@@ -7,7 +7,7 @@ This starter is designed for GitHub + Vercel + Neon and gives a coding agent eno
 ## What this MVP does
 
 - Displays an interactive MapLibre map.
-- Uses an OpenFreeMap style by default.
+- Uses a no-key USGS Topo raster basemap by default.
 - Adds a satellite/aerial imagery toggle using a configurable public raster tile source.
 - Looks up parcels from a Neon/PostGIS database by map click.
 - Loads visible parcel outlines by map bounding box.
@@ -83,6 +83,10 @@ DATABASE_URL="postgresql://..."
 ```
 
 For Vercel, use the pooled Neon connection string for runtime usage. If you add `DATABASE_DIRECT_URL`, use it only for scripts/migrations.
+
+Street view defaults to a no-key USGS Topo raster service so the app does not
+depend on a third-party vector basemap. Set `NEXT_PUBLIC_MAP_STYLE_URL` only if
+you want to use a different authorized public MapLibre style URL.
 
 Satellite view defaults to no-key USGS ImageryOnly raster services. The cached
 tile layer handles normal zooms, and a WMS detail layer takes over when zoomed

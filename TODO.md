@@ -8,7 +8,7 @@
 - [x] Run `npm run lint`.
 - [x] Run `npm run build`.
 - [x] Run `npm run dev`.
-- [x] Confirm map renders with MapLibre and OpenFreeMap.
+- [x] Confirm map renders with MapLibre and a public no-key basemap.
 - [x] Confirm `/api/health` works in server-side demo mode.
 - [x] Confirm demo parcel bbox and click lookup work.
 - [x] Confirm selected parcel highlight and details drawer work.
