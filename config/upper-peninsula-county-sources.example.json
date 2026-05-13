@@ -299,46 +299,68 @@
   },
   {
     "sourceKey": "marquette-city-mi-public",
-    "provider": "Marquette County public ArcGIS FeatureServer",
+    "provider": "City of Marquette / ViewPro GIS public ArcGIS FeatureServer",
     "county": "Marquette",
     "state": "MI",
     "sourceType": "arcgis_feature_server",
-    "sourceUrl": "https://services9.arcgis.com/6EuFgO4fLTqfNOhu/ArcGIS/rest/services/MarquetteParcelData/FeatureServer/2",
-    "where": "lower(city) = 'marquette'",
-    "sourceUpdatedAt": null,
+    "sourceUrl": "https://services6.arcgis.com/SAu6e8T3mmoVbRYn/arcgis/rest/services/Parcel_Data_gdb/FeatureServer/0",
+    "sourceUpdatedAt": "2026-03-26T14:55:17.017Z",
     "inputFile": "data/parcels/marquette-city-mi-public.geojson",
     "refreshCadence": "monthly metadata check; quarterly full refresh",
     "lastRefreshReviewedAt": null,
-    "refreshNotes": "Supplemental public ArcGIS layer used to fill Marquette city-center parcel coverage gaps in the county FetchGIS layer. Verify county layer terms before commercial reuse.",
-    "notes": "This city-filtered public layer exposes parcel geometry, site address, city, ZIP, and land-use class, but not owner/APN details.",
+    "refreshNotes": "Supplemental City of Marquette public GIS parcel layer used to fill city-center parcel coverage gaps in the county FetchGIS layer. Verify city/county terms before commercial reuse.",
+    "notes": "City zoning map viewer parcel layer exposes real PARCEL_ID values, owner name/address fields, site address fields, legal description, property class, and Web Mercator geometry returned as WGS84 GeoJSON by the ArcGIS query.",
     "fieldMap": {
       "sourceFeatureId": [
-        "ll_uuid",
-        "FID"
+        "OBJECTID",
+        "PARCEL_ID"
       ],
       "parcelId": [
-        "ll_uuid",
-        "FID"
+        "PARCEL_ID",
+        "PIN_TEXT",
+        "PIN_TEXT2",
+        "PIN_NUM"
       ],
-      "apn": [],
-      "ownerName": [],
-      "siteAddress": [
+      "apn": [
+        "PARCEL_ID",
+        "PIN_TEXT",
+        "PIN_TEXT2",
+        "PIN_NUM"
+      ],
+      "ownerName": [
         [
-          "address",
-          "city",
-          "state2",
-          "szip"
+          "ONERNAME1",
+          "ONERNAME2"
         ],
-        "address",
-        "saddstr"
+        "ONERNAME1"
       ],
-      "mailingAddress": [],
-      "acreage": [],
-      "assessedValue": [],
+      "siteAddress": [
+        "PCOMBINED"
+      ],
+      "mailingAddress": [
+        [
+          "OTADDRESS",
+          "OWNERCITY",
+          "ONERSTATE",
+          "ORZIPCODE"
+        ],
+        "OTADDRESS"
+      ],
+      "acreage": [
+        "LCACREAGE"
+      ],
+      "assessedValue": [
+        "SAR1_MBOR",
+        "TAR1_MBOR"
+      ],
       "landUse": [
-        "UseClass"
+        "PRTYCLASS",
+        "Z_PRIMARY",
+        "UHAINDEX1"
       ],
-      "legalDescription": []
+      "legalDescription": [
+        "LCRIPTION"
+      ]
     }
   },
   {

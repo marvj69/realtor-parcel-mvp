@@ -45,6 +45,8 @@ type ParcelImportRecord = {
   geometry: string;
 };
 
+const UUID_VALUE_PATTERN = /^\{?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\}?$/i;
+
 function getArg(name: string): string | undefined {
   const prefix = `--${name}=`;
   const found = process.argv.find((arg) => arg.startsWith(prefix));
@@ -130,6 +132,14 @@ function pick(props: Record<string, unknown>, candidates: FieldCandidate[] | und
 function asString(value: string | number | null): string | null {
   if (value === null || value === undefined) return null;
   return sanitizeString(String(value)).trim() || null;
+}
+
+function asParcelIdentifier(value: string | number | null): string | null {
+  const text = asString(value);
+  if (!text) return null;
+
+  // ArcGIS GlobalID/ll_uuid values are feature ids, not public parcel or APN values.
+  return UUID_VALUE_PATTERN.test(text) ? null : text;
 }
 
 function asNumber(value: string | number | null): number | null {
@@ -307,8 +317,8 @@ async function main() {
         asString((feature.id as string | number | undefined) ?? null) ??
         `${source.sourceKey}-${imported + skipped + 1}`;
 
-      const parcelId = asString(pick(properties, source.fieldMap.parcelId));
-      const apn = asString(pick(properties, source.fieldMap.apn));
+      const parcelId = asParcelIdentifier(pick(properties, source.fieldMap.parcelId));
+      const apn = asParcelIdentifier(pick(properties, source.fieldMap.apn));
       const ownerName = asString(pick(properties, source.fieldMap.ownerName));
       const siteAddress = asString(pick(properties, source.fieldMap.siteAddress));
       const mailingAddress = asString(pick(properties, source.fieldMap.mailingAddress));
