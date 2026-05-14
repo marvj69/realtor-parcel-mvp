@@ -198,7 +198,7 @@ textarea {
 
 .bottom-tab-bar {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 4px;
   flex: 0 0 auto;
   padding: 6px;
@@ -622,6 +622,59 @@ textarea {
   font-weight: 700;
 }
 
+.offline-panel {
+  display: grid;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.offline-panel .section-heading-row p {
+  margin-top: 5px;
+  font-size: 13px;
+}
+
+.offline-area-list {
+  display: grid;
+  gap: 8px;
+}
+
+.offline-area {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  background: var(--glass-panel-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.offline-area.active {
+  border-color: #10b981;
+  box-shadow: inset 3px 0 0 #10b981;
+}
+
+.offline-area strong,
+.offline-area span {
+  display: block;
+}
+
+.offline-area strong {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.offline-area span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .detail-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -854,8 +907,13 @@ textarea {
 
   .saved-project summary,
   .saved-parcel,
+  .offline-area,
   .detail-row {
     padding: 9px;
+  }
+
+  .offline-area {
+    grid-template-columns: 1fr;
   }
 
   .empty-state {

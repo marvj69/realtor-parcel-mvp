@@ -177,6 +177,7 @@ async function getParcelBbox(request: Request) {
         p.acreage,
         p.assessed_value,
         p.land_use,
+        p.legal_description,
         ST_AsGeoJSON(
           CASE
             WHEN $6::numeric > 0 THEN ST_SimplifyPreserveTopology(p.geom, $6::numeric)

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import SavedProjectsSidebar from "@/components/SavedProjectsSidebar";
 import type { AppPanel, MeasurementMode, MeasurementPoint, MeasurementSummary } from "@/types/measurement";
+import type { OfflineAreaSummary } from "@/types/offline";
 import type { ParcelFeature, ParcelSearchResult } from "@/types/parcel";
 
 type Props = {
@@ -29,6 +30,17 @@ type Props = {
   onMeasurementPointRemove: (pointId: string) => void;
   onMeasurementUndo: () => void;
   onMeasurementClear: () => void;
+  offlineAreas: OfflineAreaSummary[];
+  offlineStorageSupported: boolean;
+  offlineLoading: boolean;
+  offlineStatus: string | null;
+  offlineError: string | null;
+  activeOfflineAreaId: string | null;
+  offlineMeasuredAreaAvailable: boolean;
+  onOfflineCurrentViewDownload: () => void;
+  onOfflineMeasuredAreaDownload: () => void;
+  onOfflineAreaOpen: (areaId: string) => void;
+  onOfflineAreaDelete: (areaId: string) => void;
 };
 
 function fmt(value: unknown) {
@@ -47,6 +59,19 @@ function date(value: string | null | undefined) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function dateTime(value: string | null | undefined) {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function bytes(value: number | null | undefined) {
+  if (!value || value <= 0) return "—";
+  if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024)).toLocaleString()} KB`;
+  return `${(value / (1024 * 1024)).toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
 }
 
 function matchKindLabel(kind: ParcelSearchResult["matchKind"]) {
@@ -95,7 +120,18 @@ export default function ParcelDetails({
   onMeasurementModeChange,
   onMeasurementPointRemove,
   onMeasurementUndo,
-  onMeasurementClear
+  onMeasurementClear,
+  offlineAreas,
+  offlineStorageSupported,
+  offlineLoading,
+  offlineStatus,
+  offlineError,
+  activeOfflineAreaId,
+  offlineMeasuredAreaAvailable,
+  onOfflineCurrentViewDownload,
+  onOfflineMeasuredAreaDownload,
+  onOfflineAreaOpen,
+  onOfflineAreaDelete
 }: Props) {
   const [projectName, setProjectName] = useState("Houghton Project");
   const [tag, setTag] = useState("showing");
@@ -178,7 +214,8 @@ export default function ParcelDetails({
             ["search", "Search"],
             ["saved", "Saved"],
             ["details", parcel ? "Parcel" : "Details"],
-            ["measure", "Measure"]
+            ["measure", "Measure"],
+            ["offline", "Offline"]
           ] as const
         ).map(([panel, label]) => (
           <button
@@ -191,6 +228,7 @@ export default function ParcelDetails({
             <span>{label}</span>
             {panel === "details" && parcel ? <small>Selected</small> : null}
             {panel === "measure" && measurementPoints.length > 0 ? <small>{measurementPoints.length}</small> : null}
+            {panel === "offline" && offlineAreas.length > 0 ? <small>{offlineAreas.length}</small> : null}
           </button>
         ))}
       </nav>
@@ -365,6 +403,65 @@ export default function ParcelDetails({
                 </>
               )}
             </>
+          ) : null}
+
+          {activePanel === "offline" ? (
+            <section className="panel-section offline-panel">
+              <div className="section-heading-row">
+                <div>
+                  <h2>Offline areas</h2>
+                  <p>Parcel outlines and details are saved in this browser. Basemap imagery may still need a network connection unless the browser has cached those tiles.</p>
+                </div>
+              </div>
+
+              <div className="button-row">
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={offlineLoading || !offlineStorageSupported}
+                  onClick={onOfflineCurrentViewDownload}
+                >
+                  {offlineLoading ? "Saving..." : "Download current view"}
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={offlineLoading || !offlineStorageSupported || !offlineMeasuredAreaAvailable}
+                  onClick={onOfflineMeasuredAreaDownload}
+                >
+                  Download measured area
+                </button>
+              </div>
+
+              {!offlineStorageSupported ? <p className="message error">This browser cannot save offline parcel areas.</p> : null}
+              {offlineStatus ? <p className="message success">{offlineStatus}</p> : null}
+              {offlineError ? <p className="message error">{offlineError}</p> : null}
+
+              {offlineAreas.length === 0 ? (
+                <p className="panel-note">No offline parcel areas saved in this browser yet.</p>
+              ) : (
+                <div className="offline-area-list">
+                  {offlineAreas.map((area) => (
+                    <article className={area.id === activeOfflineAreaId ? "offline-area active" : "offline-area"} key={area.id}>
+                      <div>
+                        <strong>{area.name}</strong>
+                        <span>
+                          {area.parcelCount.toLocaleString()} parcels · {bytes(area.storageBytes)} · {dateTime(area.downloadedAt)}
+                        </span>
+                      </div>
+                      <div className="button-row">
+                        <button className="secondary-button compact-button" type="button" disabled={offlineLoading} onClick={() => onOfflineAreaOpen(area.id)}>
+                          View
+                        </button>
+                        <button className="text-button" type="button" disabled={offlineLoading} onClick={() => onOfflineAreaDelete(area.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
           ) : null}
 
           {activePanel === "measure" ? (

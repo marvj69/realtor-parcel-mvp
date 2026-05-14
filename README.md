@@ -13,6 +13,7 @@ This starter is designed for GitHub + Vercel + Neon and gives a coding agent eno
 - Loads visible parcel outlines by map bounding box.
 - Shows a parcel details drawer.
 - Saves parcels to a lightweight project table.
+- Saves selected map areas to browser storage for offline parcel review.
 - Includes import scripts for public GIS parcel GeoJSON / ArcGIS FeatureServer data.
 - Includes agent instructions, data-source playbook, schema, todo list, and deployment notes.
 

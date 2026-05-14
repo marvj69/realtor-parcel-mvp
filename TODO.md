@@ -69,6 +69,7 @@
 - [ ] Showing notes.
 - [ ] Basic printable property brief.
 - [x] Measurement tools for distance/area.
+- [x] Browser-saved offline parcel area downloads.
 - [ ] Absentee owner hint when owner mailing address differs from site address.
 - [ ] Simple acreage/land-use filters.
 

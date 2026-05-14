@@ -1,4 +1,4 @@
-export type AppPanel = "map" | "search" | "saved" | "details" | "measure";
+export type AppPanel = "map" | "search" | "saved" | "details" | "measure" | "offline";
 
 export type MeasurementMode = "distance" | "area" | "rectangle";
 

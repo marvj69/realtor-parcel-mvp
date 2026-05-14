@@ -5,8 +5,18 @@ import maplibregl from "maplibre-gl";
 import { area as turfArea, bbox as turfBbox, length as turfLength, lineString as turfLineString, polygon as turfPolygon } from "@turf/turf";
 import type { Feature, FeatureCollection, Geometry, MultiPolygon, Polygon, Position } from "geojson";
 import ParcelDetails from "@/components/ParcelDetails";
+import {
+  deleteOfflineArea,
+  estimateOfflineAreaBytes,
+  getOfflineArea,
+  isOfflineAreaStorageSupported,
+  listOfflineAreas,
+  requestPersistentOfflineStorage,
+  saveOfflineArea
+} from "@/lib/offline-areas";
 import type { AppPanel, MeasurementMode, MeasurementPoint, MeasurementSummary } from "@/types/measurement";
-import type { ParcelFeature, ParcelProperties, ParcelSearchResult } from "@/types/parcel";
+import type { OfflineArea, OfflineAreaBbox, OfflineAreaSummary } from "@/types/offline";
+import type { ParcelFeature, ParcelFeatureCollection, ParcelProperties, ParcelSearchResult } from "@/types/parcel";
 
 const EMPTY_FEATURE_COLLECTION: FeatureCollection<Polygon | MultiPolygon, ParcelProperties> = {
   type: "FeatureCollection",
@@ -29,6 +39,9 @@ const PARCEL_TILE_FILL_LAYER_ID = "parcel-tile-fill";
 const PARCEL_TILE_LINE_LAYER_ID = "parcel-tile-line";
 const PARCEL_GEOJSON_FILL_LAYER_ID = "parcel-fill";
 const PARCEL_GEOJSON_LINE_LAYER_ID = "parcel-line";
+const OFFLINE_PARCEL_SOURCE_ID = "offline-parcels";
+const OFFLINE_PARCEL_FILL_LAYER_ID = "offline-parcel-fill";
+const OFFLINE_PARCEL_LINE_LAYER_ID = "offline-parcel-line";
 const SELECTED_PARCEL_LINE_LAYER_ID = "selected-parcel-line";
 const MEASUREMENT_SOURCE_ID = "measurements";
 const MEASUREMENT_FILL_LAYER_ID = "measurement-fill";
@@ -51,6 +64,7 @@ const SELECTED_PARCEL_TOP_PADDING = 76;
 const SELECTED_PARCEL_SIDE_PADDING = 24;
 const SELECTED_PARCEL_BOTTOM_MARGIN = 36;
 const SELECTED_PARCEL_MIN_BOTTOM_PADDING = 160;
+const OFFLINE_DOWNLOAD_ZOOM = 17;
 
 type MeasurementFeatureProperties = {
   kind: "line" | "shape" | "point";
@@ -60,6 +74,7 @@ type MeasurementFeatureProperties = {
 type BasemapMode = "streets" | "satellite";
 type MapStyleConfig = string | maplibregl.StyleSpecification;
 type NumberInterpolateExpression = ["interpolate", ["linear"], ["zoom"], number, number, number, number];
+type SelectableParcelSource = "live" | "offline";
 
 function GlobeIcon() {
   return (
@@ -176,15 +191,24 @@ function setGeoJsonSourceData(
 }
 
 function getSelectableParcelAtPoint(map: maplibregl.Map, point: maplibregl.PointLike) {
+  const offlineLayerIds = [OFFLINE_PARCEL_FILL_LAYER_ID].filter((layerId) => Boolean(map.getLayer(layerId)));
+  const offlineFeatures = offlineLayerIds.length > 0 ? map.queryRenderedFeatures(point, { layers: offlineLayerIds }) : [];
+  const offlineParcelId =
+    offlineFeatures.find((feature) => typeof feature.properties?.id === "string")?.properties?.id ?? null;
+
+  if (offlineFeatures.length > 0) {
+    return { hasFeature: true, parcelId: offlineParcelId, source: "offline" as SelectableParcelSource };
+  }
+
   const parcelLayerIds = [PARCEL_TILE_FILL_LAYER_ID, PARCEL_GEOJSON_FILL_LAYER_ID].filter((layerId) =>
     Boolean(map.getLayer(layerId))
   );
 
-  if (parcelLayerIds.length === 0) return { hasFeature: false, parcelId: null };
+  if (parcelLayerIds.length === 0) return { hasFeature: false, parcelId: null, source: null };
 
   const features = map.queryRenderedFeatures(point, { layers: parcelLayerIds });
   const parcelId = features.find((feature) => typeof feature.properties?.id === "string")?.properties?.id ?? null;
-  return { hasFeature: features.length > 0, parcelId };
+  return { hasFeature: features.length > 0, parcelId, source: features.length > 0 ? ("live" as SelectableParcelSource) : null };
 }
 
 function setMeasurementSourceData(
@@ -250,6 +274,65 @@ function focusMapOnSelectedParcel(map: maplibregl.Map, parcel: ParcelFeature) {
       });
     });
   });
+}
+
+function getBoundsBbox(bounds: maplibregl.LngLatBounds): OfflineAreaBbox {
+  return [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()];
+}
+
+function fitMapToBbox(map: maplibregl.Map, bbox: OfflineAreaBbox) {
+  const [west, south, east, north] = bbox;
+  map.fitBounds(
+    new maplibregl.LngLatBounds([west, south], [east, north]),
+    {
+      padding: {
+        top: 72,
+        right: 24,
+        bottom: 220,
+        left: 24
+      },
+      maxZoom: 17,
+      duration: 700,
+      essential: true
+    }
+  );
+}
+
+function getMeasurementDownloadBbox(mode: MeasurementMode, points: MeasurementPoint[]): OfflineAreaBbox | null {
+  const minimumPointCount = mode === "area" ? 3 : mode === "rectangle" ? 2 : Number.POSITIVE_INFINITY;
+  if (points.length < minimumPointCount) return null;
+
+  const lngs = points.map((point) => point.lng);
+  const lats = points.map((point) => point.lat);
+  const west = Math.min(...lngs);
+  const south = Math.min(...lats);
+  const east = Math.max(...lngs);
+  const north = Math.max(...lats);
+
+  if (west === east || south === north) return null;
+  return [west, south, east, north];
+}
+
+function createOfflineAreaId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function createOfflineAreaName(source: "current-view" | "measurement", parcelCount: number) {
+  const label = source === "current-view" ? "Current view" : "Measured area";
+  const timestamp = new Date().toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+  return `${label} - ${parcelCount.toLocaleString()} parcels - ${timestamp}`;
+}
+
+function findCachedParcel(featureCollection: ParcelFeatureCollection | null, parcelId: string | null) {
+  if (!parcelId) return null;
+  return featureCollection?.features.find((feature) => feature.properties.id === parcelId) ?? null;
 }
 
 function pointPosition(point: MeasurementPoint): Position {
@@ -428,6 +511,7 @@ export default function ParcelMap() {
   const activePanelRef = useRef<AppPanel>("map");
   const measurementModeRef = useRef<MeasurementMode>("distance");
   const selectedParcelRef = useRef<ParcelFeature | null>(null);
+  const offlineFeatureCollectionRef = useRef<ParcelFeatureCollection | null>(null);
   const [selectedParcel, setSelectedParcel] = useState<ParcelFeature | null>(null);
   const [activePanel, setActivePanel] = useState<AppPanel>("map");
   const [basemapMode, setBasemapMode] = useState<BasemapMode>("streets");
@@ -452,10 +536,156 @@ export default function ParcelMap() {
   const [signupPassword, setSignupPassword] = useState("");
   const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
+  const [offlineAreas, setOfflineAreas] = useState<OfflineAreaSummary[]>([]);
+  const [offlineStorageSupported, setOfflineStorageSupported] = useState(false);
+  const [offlineLoading, setOfflineLoading] = useState(false);
+  const [offlineStatus, setOfflineStatus] = useState<string | null>(null);
+  const [offlineError, setOfflineError] = useState<string | null>(null);
+  const [activeOfflineAreaId, setActiveOfflineAreaId] = useState<string | null>(null);
 
   function setSelectedParcelState(nextParcel: ParcelFeature | null) {
     selectedParcelRef.current = nextParcel;
     setSelectedParcel(nextParcel);
+  }
+
+  async function refreshOfflineAreas() {
+    if (!isOfflineAreaStorageSupported()) {
+      setOfflineStorageSupported(false);
+      setOfflineStatus("Offline area storage is not available in this browser.");
+      return;
+    }
+
+    setOfflineStorageSupported(true);
+    try {
+      setOfflineAreas(await listOfflineAreas());
+    } catch (err) {
+      setOfflineError(err instanceof Error ? err.message : "Unable to load browser-saved areas");
+    }
+  }
+
+  function displayOfflineArea(area: OfflineArea) {
+    const map = mapRef.current;
+    offlineFeatureCollectionRef.current = area.featureCollection;
+    setActiveOfflineAreaId(area.id);
+    setOfflineStatus(`${area.parcelCount.toLocaleString()} downloaded parcel${area.parcelCount === 1 ? "" : "s"} loaded from this browser.`);
+    setOfflineError(null);
+
+    if (map) {
+      setGeoJsonSourceData(map, OFFLINE_PARCEL_SOURCE_ID, area.featureCollection);
+      fitMapToBbox(map, area.bbox);
+    }
+  }
+
+  function clearOfflineAreaOverlay() {
+    const map = mapRef.current;
+    offlineFeatureCollectionRef.current = null;
+    setActiveOfflineAreaId(null);
+    if (map) setGeoJsonSourceData(map, OFFLINE_PARCEL_SOURCE_ID, EMPTY_FEATURE_COLLECTION);
+  }
+
+  async function openOfflineArea(areaId: string) {
+    setOfflineLoading(true);
+    setOfflineError(null);
+
+    try {
+      const area = await getOfflineArea(areaId);
+      if (!area) throw new Error("That downloaded area is no longer saved in this browser.");
+      displayOfflineArea(area);
+    } catch (err) {
+      setOfflineError(err instanceof Error ? err.message : "Unable to open downloaded area");
+    } finally {
+      setOfflineLoading(false);
+    }
+  }
+
+  async function removeOfflineArea(areaId: string) {
+    setOfflineLoading(true);
+    setOfflineError(null);
+
+    try {
+      await deleteOfflineArea(areaId);
+      if (areaId === activeOfflineAreaId) clearOfflineAreaOverlay();
+      await refreshOfflineAreas();
+      setOfflineStatus("Downloaded area removed from this browser.");
+    } catch (err) {
+      setOfflineError(err instanceof Error ? err.message : "Unable to remove downloaded area");
+    } finally {
+      setOfflineLoading(false);
+    }
+  }
+
+  async function downloadOfflineArea(source: "current-view" | "measurement") {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const bbox = source === "current-view" ? getBoundsBbox(map.getBounds()) : getMeasurementDownloadBbox(measurementMode, measurementPoints);
+    if (!bbox) {
+      setOfflineError("Measure an area box before downloading a measured area.");
+      return;
+    }
+
+    if (!isOfflineAreaStorageSupported()) {
+      setOfflineError("This browser cannot save offline parcel areas.");
+      setOfflineStorageSupported(false);
+      return;
+    }
+
+    setOfflineLoading(true);
+    setOfflineError(null);
+    setOfflineStatus("Preparing parcel area for browser storage...");
+
+    try {
+      await requestPersistentOfflineStorage();
+
+      const zoom = Math.max(map.getZoom(), OFFLINE_DOWNLOAD_ZOOM);
+      const params = new URLSearchParams({
+        bbox: bbox.join(","),
+        zoom: String(zoom),
+        metadataOnly: "0"
+      });
+      const response = await fetch(`/api/parcels/bbox?${params.toString()}`, { cache: "no-store" });
+      const payload = (await response.json()) as BboxPayload;
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Unable to download this area");
+      }
+
+      if (payload.tooMany) {
+        throw new Error(payload.message ?? "This area has too many parcels. Select a smaller area and try again.");
+      }
+
+      const featureCollection = payload.data ?? EMPTY_FEATURE_COLLECTION;
+      const parcelCount = featureCollection.features.length;
+      if (parcelCount === 0) {
+        setOfflineStatus("No parcel records were found inside that area.");
+        return;
+      }
+
+      const downloadedAt = new Date().toISOString();
+      const areaWithoutSize = {
+        id: createOfflineAreaId(),
+        name: createOfflineAreaName(source, parcelCount),
+        bbox,
+        zoom,
+        parcelCount,
+        featureCollection,
+        downloadedAt
+      };
+      const area: OfflineArea = {
+        ...areaWithoutSize,
+        storageBytes: estimateOfflineAreaBytes(areaWithoutSize)
+      };
+
+      await saveOfflineArea(area);
+      await refreshOfflineAreas();
+      displayOfflineArea(area);
+      setActivePanel("offline");
+      setOfflineStatus(`${parcelCount.toLocaleString()} parcel${parcelCount === 1 ? "" : "s"} saved to this browser for offline review.`);
+    } catch (err) {
+      setOfflineError(err instanceof Error ? err.message : "Unable to save area to this browser");
+    } finally {
+      setOfflineLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -486,6 +716,15 @@ export default function ParcelMap() {
     void loadSession();
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    if (authLoading || !authData?.authenticated) return;
+    const timeout = window.setTimeout(() => {
+      void refreshOfflineAreas();
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, [authData?.authenticated, authLoading]);
 
   useEffect(() => {
     basemapModeRef.current = basemapMode;
@@ -810,6 +1049,32 @@ export default function ParcelMap() {
         }
       });
 
+      map.addSource(OFFLINE_PARCEL_SOURCE_ID, {
+        type: "geojson",
+        data: EMPTY_FEATURE_COLLECTION
+      });
+
+      map.addLayer({
+        id: OFFLINE_PARCEL_FILL_LAYER_ID,
+        type: "fill",
+        source: OFFLINE_PARCEL_SOURCE_ID,
+        paint: {
+          "fill-color": "#10b981",
+          "fill-opacity": 0.14
+        }
+      });
+
+      map.addLayer({
+        id: OFFLINE_PARCEL_LINE_LAYER_ID,
+        type: "line",
+        source: OFFLINE_PARCEL_SOURCE_ID,
+        paint: {
+          "line-color": "#047857",
+          "line-opacity": 0.86,
+          "line-width": 1.4
+        }
+      });
+
       map.addLayer({
         id: "selected-parcel-fill",
         type: "fill",
@@ -900,6 +1165,15 @@ export default function ParcelMap() {
         setSelectedParcelFeature(null);
         setStatusMessage("Parcel unselected.");
         return;
+      }
+
+      if (clickedParcel.source === "offline") {
+        const cachedParcel = findCachedParcel(offlineFeatureCollectionRef.current, clickedParcel.parcelId);
+        if (cachedParcel) {
+          setSelectedParcelFeature(cachedParcel);
+          setStatusMessage("Selected parcel from a downloaded browser area.");
+          return;
+        }
       }
 
       await selectParcelAt(event.lngLat.lng, event.lngLat.lat);
@@ -1215,6 +1489,17 @@ export default function ParcelMap() {
         onMeasurementPointRemove={removeMeasurementPoint}
         onMeasurementUndo={() => setMeasurementPoints((current) => current.slice(0, -1))}
         onMeasurementClear={() => setMeasurementPoints([])}
+        offlineAreas={offlineAreas}
+        offlineStorageSupported={offlineStorageSupported}
+        offlineLoading={offlineLoading}
+        offlineStatus={offlineStatus}
+        offlineError={offlineError}
+        activeOfflineAreaId={activeOfflineAreaId}
+        offlineMeasuredAreaAvailable={Boolean(getMeasurementDownloadBbox(measurementMode, measurementPoints))}
+        onOfflineCurrentViewDownload={() => void downloadOfflineArea("current-view")}
+        onOfflineMeasuredAreaDownload={() => void downloadOfflineArea("measurement")}
+        onOfflineAreaOpen={(areaId) => void openOfflineArea(areaId)}
+        onOfflineAreaDelete={(areaId) => void removeOfflineArea(areaId)}
       />
     </div>
   );
