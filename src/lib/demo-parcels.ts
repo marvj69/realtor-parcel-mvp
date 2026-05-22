@@ -2,41 +2,7 @@ import { bbox as turfBbox, booleanPointInPolygon, point, pointOnFeature } from "
 import type { MultiPolygon, Polygon } from "geojson";
 import type { ParcelFeature, ParcelFeatureCollection, ParcelSearchResult, SavedProjectSummary } from "@/types/parcel";
 
-const DEMO_PARCELS: ParcelFeature[] = [
-  {
-    type: "Feature",
-    geometry: {
-      type: "Polygon",
-      coordinates: [[
-        [-88.574, 47.124],
-        [-88.568, 47.124],
-        [-88.568, 47.12],
-        [-88.574, 47.12],
-        [-88.574, 47.124]
-      ]]
-    },
-    properties: {
-      id: "00000000-0000-4000-8000-000000000001",
-      sourceKey: "demo-houghton-mi",
-      sourceFeatureId: "demo-001",
-      provider: "Demo / fictional seed data",
-      sourceCounty: "Houghton",
-      state: "MI",
-      sourceUrl: "db/seed.sql",
-      sourceUpdatedAt: null,
-      importedAt: "2026-05-10T23:17:00.000Z",
-      parcelId: "DEMO-001",
-      apn: "00-00-000-001",
-      ownerName: "Demo Owner LLC",
-      siteAddress: "100 Demo Parcel Rd, Houghton, MI",
-      mailingAddress: "PO Box 100, Houghton, MI",
-      acreage: 2.65,
-      assessedValue: 85000,
-      landUse: "Residential vacant",
-      legalDescription: "Fictional legal description for app testing."
-    }
-  }
-];
+const DEMO_PARCELS: ParcelFeature[] = [];
 
 function intersectsBbox(feature: ParcelFeature, bbox: [number, number, number, number]) {
   const [minLng, minLat, maxLng, maxLat] = bbox;
@@ -88,7 +54,7 @@ export function hasDemoParcel(id: string) {
 
 export function getDemoProjects(): SavedProjectSummary[] {
   const demoParcel = DEMO_PARCELS[0];
-  const importedAt = demoParcel.properties.importedAt ?? new Date(0).toISOString();
+  const importedAt = demoParcel?.properties.importedAt ?? new Date(0).toISOString();
 
   return [
     {
@@ -98,25 +64,27 @@ export function getDemoProjects(): SavedProjectSummary[] {
       description: "Demo fallback project shown when DATABASE_URL is not configured.",
       createdAt: importedAt,
       updatedAt: importedAt,
-      savedParcelCount: 1,
-      savedParcels: [
-        {
-          id: `demo-save-${demoParcel.properties.id}`,
-          projectId: "demo-project",
-          label: null,
-          tag: "showing",
-          createdAt: importedAt,
-          parcel: demoParcel.properties,
-          center: pointOnFeature(demoParcel).geometry,
-          notes: [
+      savedParcelCount: demoParcel ? 1 : 0,
+      savedParcels: demoParcel
+        ? [
             {
-              id: "demo-note-1",
-              note: "Demo note. Configure DATABASE_URL to persist real saved project data.",
-              createdAt: importedAt
+              id: `demo-save-${demoParcel.properties.id}`,
+              projectId: "demo-project",
+              label: null,
+              tag: "showing",
+              createdAt: importedAt,
+              parcel: demoParcel.properties,
+              center: pointOnFeature(demoParcel).geometry,
+              notes: [
+                {
+                  id: "demo-note-1",
+                  note: "Demo note. Configure DATABASE_URL to persist real saved project data.",
+                  createdAt: importedAt
+                }
+              ]
             }
           ]
-        }
-      ]
+        : []
     }
   ];
 }

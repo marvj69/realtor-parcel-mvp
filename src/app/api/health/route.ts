@@ -15,7 +15,7 @@ async function getHealth() {
         now: new Date().toISOString(),
         postgis_version: null,
         auth_enabled: isPrivateAuthEnabled(),
-        warning: "DATABASE_URL is not configured; server-side demo parcel data is active."
+        warning: "DATABASE_URL is not configured; parcel data is unavailable in demo mode."
       }
     });
   }

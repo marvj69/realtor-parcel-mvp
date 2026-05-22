@@ -108,7 +108,7 @@ users can create their own email/password account without a shared workspace pas
 npm run db:schema
 ```
 
-### 4. Seed demo parcel
+### 4. Seed default project metadata
 
 ```bash
 npm run db:seed
@@ -120,7 +120,7 @@ npm run db:seed
 npm run dev
 ```
 
-Open the local app. The map is centered near Houghton, Michigan by default. Click near the demo parcel area after seeding.
+Open the local app. The map is centered near Houghton, Michigan by default. Import or connect a real parcel source before testing parcel clicks.
 
 ## Import real parcel data
 

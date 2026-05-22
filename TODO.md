@@ -10,7 +10,7 @@
 - [x] Run `npm run dev`.
 - [x] Confirm map renders with MapLibre and a public no-key basemap.
 - [x] Confirm `/api/health` works in server-side demo mode.
-- [x] Confirm demo parcel bbox and click lookup work.
+- [x] Confirm parcel bbox and click lookup work.
 - [x] Confirm selected parcel highlight and details drawer work.
 - [x] Confirm save parcel API can be triggered in demo mode.
 - [x] Replace placeholder `.env.local` `DATABASE_URL` with a real Neon PostGIS connection string.
