@@ -13,8 +13,8 @@
 | `NEXT_PUBLIC_MAP_STYLE_URL` | No | Vercel + local `.env.local` | Optional public MapLibre style URL. Leave empty to use the built-in no-key USGS Topo raster basemap. |
 | `NEXT_PUBLIC_SATELLITE_TILE_URL` | Optional | Vercel + local `.env.local` | Public raster satellite/aerial tile template. Defaults to USGS ImageryOnly cached tiles. |
 | `NEXT_PUBLIC_SATELLITE_DETAIL_TILE_URL` | Optional | Vercel + local `.env.local` | Public high-zoom satellite/aerial tile template. Defaults to USGS ImageryOnly WMS with `{bbox-epsg-3857}`. Set to an empty string to disable. |
-| `NEXT_PUBLIC_SATELLITE_DETAIL_MIN_ZOOM` | Optional | Vercel + local `.env.local` | Zoom where the high-detail satellite layer fades in. Defaults to `16`. |
-| `NEXT_PUBLIC_SATELLITE_DETAIL_MAX_ZOOM` | Optional | Vercel + local `.env.local` | Maximum source zoom for the high-detail satellite layer. Defaults to `19`. |
+| `NEXT_PUBLIC_SATELLITE_DETAIL_MIN_ZOOM` | Optional | Vercel + local `.env.local` | Zoom where the high-detail satellite layer fades in. Defaults to `15`. |
+| `NEXT_PUBLIC_SATELLITE_DETAIL_MAX_ZOOM` | Optional | Vercel + local `.env.local` | Maximum source zoom for the high-detail satellite layer. Defaults to `22`. |
 | `NEXT_PUBLIC_SATELLITE_ATTRIBUTION` | Optional | Vercel + local `.env.local` | Public attribution text for satellite/aerial imagery. |
 | `NEXT_PUBLIC_DEFAULT_CENTER` | Yes | Vercel + local `.env.local` | `longitude,latitude` default map center. |
 | `NEXT_PUBLIC_DEFAULT_ZOOM` | Yes | Vercel + local `.env.local` | Default map zoom. |

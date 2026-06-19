@@ -91,7 +91,7 @@ you want to use a different authorized public MapLibre style URL.
 
 Satellite view defaults to no-key USGS ImageryOnly raster services. The cached
 tile layer handles normal zooms, and a WMS detail layer takes over when zoomed
-in so imagery does not have to stretch z16 tiles. Override
+in so imagery does not have to stretch cached tiles. Override
 `NEXT_PUBLIC_SATELLITE_TILE_URL` or `NEXT_PUBLIC_SATELLITE_DETAIL_TILE_URL` if
 you prefer a different authorized public tile source. Set
 `NEXT_PUBLIC_SATELLITE_DETAIL_TILE_URL` to an empty string to disable the

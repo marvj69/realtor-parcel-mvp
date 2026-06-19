@@ -58,8 +58,11 @@ const DEFAULT_STREET_ATTRIBUTION = "USGS The National Map: US Topo";
 const DEFAULT_SATELLITE_TILE_URL =
   "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}";
 const DEFAULT_SATELLITE_DETAIL_TILE_URL =
-  "https://basemap.nationalmap.gov/arcgis/services/USGSImageryOnly/MapServer/WMSServer?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=0&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=512&HEIGHT=512&FORMAT=image/jpeg";
+  "https://basemap.nationalmap.gov/arcgis/services/USGSImageryOnly/MapServer/WMSServer?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=0&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=1024&HEIGHT=1024&FORMAT=image/jpeg";
 const DEFAULT_SATELLITE_ATTRIBUTION = "USDA, USGS The National Map: Orthoimagery";
+const DEFAULT_SATELLITE_DETAIL_MIN_ZOOM = 15;
+const DEFAULT_SATELLITE_DETAIL_MAX_ZOOM = 22;
+const SATELLITE_DETAIL_FADE_ZOOM_DELTA = 0.75;
 const SELECTED_PARCEL_TOP_PADDING = 76;
 const SELECTED_PARCEL_SIDE_PADDING = 24;
 const SELECTED_PARCEL_BOTTOM_MARGIN = 36;
@@ -73,6 +76,8 @@ type MeasurementFeatureProperties = {
 
 type BasemapMode = "streets" | "satellite";
 type MapStyleConfig = string | maplibregl.StyleSpecification;
+type LayerVisibility = "visible" | "none";
+type LayerVisibilityById = Record<string, LayerVisibility>;
 type NumberInterpolateExpression = ["interpolate", ["linear"], ["zoom"], number, number, number, number];
 type SelectableParcelSource = "live" | "offline";
 
@@ -124,6 +129,46 @@ function setParcelBoundaryPaint(map: maplibregl.Map, basemapMode: BasemapMode, m
   }
 }
 
+function getStyleLayerVisibility(layer: maplibregl.LayerSpecification): LayerVisibility {
+  return layer.layout?.visibility === "none" ? "none" : "visible";
+}
+
+function captureStreetBasemapLayerVisibility(map: maplibregl.Map): LayerVisibilityById {
+  const layers = map.getStyle().layers ?? [];
+  return Object.fromEntries(layers.map((layer) => [layer.id, getStyleLayerVisibility(layer)]));
+}
+
+function setStreetBasemapVisibility(
+  map: maplibregl.Map,
+  basemapMode: BasemapMode,
+  streetLayerVisibility: LayerVisibilityById
+) {
+  for (const [layerId, originalVisibility] of Object.entries(streetLayerVisibility)) {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, "visibility", basemapMode === "streets" ? originalVisibility : "none");
+    }
+  }
+}
+
+function setSatelliteBasemapVisibility(map: maplibregl.Map, basemapMode: BasemapMode) {
+  for (const layerId of SATELLITE_LAYER_IDS) {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, "visibility", basemapMode === "satellite" ? "visible" : "none");
+    }
+  }
+}
+
+function applyBasemapMode(
+  map: maplibregl.Map,
+  basemapMode: BasemapMode,
+  streetLayerVisibility: LayerVisibilityById,
+  parcelMinZoom: number
+) {
+  setStreetBasemapVisibility(map, basemapMode, streetLayerVisibility);
+  setSatelliteBasemapVisibility(map, basemapMode);
+  setParcelBoundaryPaint(map, basemapMode, parcelMinZoom);
+}
+
 function getStreetMapStyle(styleUrl: string | undefined): MapStyleConfig {
   const trimmedStyleUrl = styleUrl?.trim();
 
@@ -158,16 +203,24 @@ function getMapConfig() {
   const lng = Number(lngRaw);
   const lat = Number(latRaw);
   const satelliteDetailTileUrlEnv = process.env.NEXT_PUBLIC_SATELLITE_DETAIL_TILE_URL;
-  const satelliteDetailMinZoom = Number(process.env.NEXT_PUBLIC_SATELLITE_DETAIL_MIN_ZOOM ?? 16);
-  const satelliteDetailMaxZoom = Number(process.env.NEXT_PUBLIC_SATELLITE_DETAIL_MAX_ZOOM ?? 19);
+  const satelliteDetailMinZoom = Number(
+    process.env.NEXT_PUBLIC_SATELLITE_DETAIL_MIN_ZOOM ?? DEFAULT_SATELLITE_DETAIL_MIN_ZOOM
+  );
+  const satelliteDetailMaxZoom = Number(
+    process.env.NEXT_PUBLIC_SATELLITE_DETAIL_MAX_ZOOM ?? DEFAULT_SATELLITE_DETAIL_MAX_ZOOM
+  );
 
   return {
     style: getStreetMapStyle(process.env.NEXT_PUBLIC_MAP_STYLE_URL),
     satelliteTileUrl: process.env.NEXT_PUBLIC_SATELLITE_TILE_URL ?? DEFAULT_SATELLITE_TILE_URL,
     satelliteDetailTileUrl:
       satelliteDetailTileUrlEnv === "" ? null : satelliteDetailTileUrlEnv ?? DEFAULT_SATELLITE_DETAIL_TILE_URL,
-    satelliteDetailMinZoom: Number.isFinite(satelliteDetailMinZoom) ? satelliteDetailMinZoom : 16,
-    satelliteDetailMaxZoom: Number.isFinite(satelliteDetailMaxZoom) ? satelliteDetailMaxZoom : 19,
+    satelliteDetailMinZoom: Number.isFinite(satelliteDetailMinZoom)
+      ? satelliteDetailMinZoom
+      : DEFAULT_SATELLITE_DETAIL_MIN_ZOOM,
+    satelliteDetailMaxZoom: Number.isFinite(satelliteDetailMaxZoom)
+      ? satelliteDetailMaxZoom
+      : DEFAULT_SATELLITE_DETAIL_MAX_ZOOM,
     satelliteAttribution: process.env.NEXT_PUBLIC_SATELLITE_ATTRIBUTION ?? DEFAULT_SATELLITE_ATTRIBUTION,
     center: [Number.isFinite(lng) ? lng : -88.569, Number.isFinite(lat) ? lat : 47.1211] as [number, number],
     zoom: Number(process.env.NEXT_PUBLIC_DEFAULT_ZOOM ?? 13)
@@ -512,6 +565,7 @@ export default function ParcelMap() {
   const measurementModeRef = useRef<MeasurementMode>("distance");
   const selectedParcelRef = useRef<ParcelFeature | null>(null);
   const offlineFeatureCollectionRef = useRef<ParcelFeatureCollection | null>(null);
+  const streetLayerVisibilityRef = useRef<LayerVisibilityById>({});
   const [selectedParcel, setSelectedParcel] = useState<ParcelFeature | null>(null);
   const [activePanel, setActivePanel] = useState<AppPanel>("map");
   const [basemapMode, setBasemapMode] = useState<BasemapMode>("streets");
@@ -730,13 +784,7 @@ export default function ParcelMap() {
     basemapModeRef.current = basemapMode;
     const map = mapRef.current;
     if (!map?.getLayer(SATELLITE_LAYER_ID)) return;
-
-    for (const layerId of SATELLITE_LAYER_IDS) {
-      if (map.getLayer(layerId)) {
-        map.setLayoutProperty(layerId, "visibility", basemapMode === "satellite" ? "visible" : "none");
-      }
-    }
-    setParcelBoundaryPaint(map, basemapMode, getParcelLayerConfig().minZoom);
+    applyBasemapMode(map, basemapMode, streetLayerVisibilityRef.current, getParcelLayerConfig().minZoom);
   }, [basemapMode]);
 
   useEffect(() => {
@@ -915,6 +963,8 @@ export default function ParcelMap() {
     }
 
     map.on("load", () => {
+      streetLayerVisibilityRef.current = captureStreetBasemapLayerVisibility(map);
+
       map.addSource(SATELLITE_SOURCE_ID, {
         type: "raster",
         tiles: [config.satelliteTileUrl],
@@ -923,7 +973,7 @@ export default function ParcelMap() {
         attribution: config.satelliteAttribution
       });
 
-      map.addLayer({
+      const satelliteLayer: maplibregl.RasterLayerSpecification = {
         id: SATELLITE_LAYER_ID,
         type: "raster",
         source: SATELLITE_SOURCE_ID,
@@ -933,7 +983,13 @@ export default function ParcelMap() {
         paint: {
           "raster-opacity": 1
         }
-      });
+      };
+
+      if (config.satelliteDetailTileUrl) {
+        satelliteLayer.maxzoom = Math.max(config.satelliteDetailMinZoom, 0) + SATELLITE_DETAIL_FADE_ZOOM_DELTA;
+      }
+
+      map.addLayer(satelliteLayer);
 
       if (config.satelliteDetailTileUrl) {
         const detailMinZoom = Math.max(0, config.satelliteDetailMinZoom);
@@ -953,11 +1009,21 @@ export default function ParcelMap() {
           type: "raster",
           source: SATELLITE_DETAIL_SOURCE_ID,
           minzoom: detailMinZoom,
+          maxzoom: detailMaxZoom,
           layout: {
             visibility: basemapModeRef.current === "satellite" ? "visible" : "none"
           },
           paint: {
-            "raster-opacity": ["interpolate", ["linear"], ["zoom"], detailMinZoom, 0, detailMinZoom + 0.75, 1]
+            "raster-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              detailMinZoom,
+              0,
+              detailMinZoom + SATELLITE_DETAIL_FADE_ZOOM_DELTA,
+              1
+            ],
+            "raster-resampling": "linear"
           }
         });
       }
@@ -1136,7 +1202,7 @@ export default function ParcelMap() {
         }
       });
 
-      setParcelBoundaryPaint(map, basemapModeRef.current, parcelLayerConfig.minZoom);
+      applyBasemapMode(map, basemapModeRef.current, streetLayerVisibilityRef.current, parcelLayerConfig.minZoom);
       queueVisibleParcelLoad(0);
     });
 
@@ -1184,6 +1250,7 @@ export default function ParcelMap() {
       if (parcelDebounceRef.current) clearTimeout(parcelDebounceRef.current);
       map.remove();
       mapRef.current = null;
+      streetLayerVisibilityRef.current = {};
     };
   }, [authData?.authenticated, authLoading]);
 
