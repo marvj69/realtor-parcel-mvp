@@ -63,6 +63,8 @@ const DEFAULT_SATELLITE_ATTRIBUTION = "State of Michigan public imagery";
 const DEFAULT_SATELLITE_DETAIL_MIN_ZOOM = 19;
 const DEFAULT_SATELLITE_DETAIL_MAX_ZOOM = 19;
 const SATELLITE_DETAIL_FADE_ZOOM_DELTA = 0.75;
+const MAPLIBRE_WORKER_LIMIT = 4;
+const MAP_TILE_CACHE_ZOOM_LEVELS = 8;
 const SELECTED_PARCEL_TOP_PADDING = 76;
 const SELECTED_PARCEL_SIDE_PADDING = 24;
 const SELECTED_PARCEL_BOTTOM_MARGIN = 36;
@@ -103,6 +105,11 @@ function TreeIcon() {
 
 function getStreetParcelTileLineOpacity(minZoom: number): NumberInterpolateExpression {
   return ["interpolate", ["linear"], ["zoom"], minZoom, 0.45, 16, 0.8];
+}
+
+function configureMapPerformance() {
+  const availableCores = navigator.hardwareConcurrency || 2;
+  maplibregl.setWorkerCount(Math.min(Math.max(2, Math.floor(availableCores / 2)), MAPLIBRE_WORKER_LIMIT));
 }
 
 function setParcelBoundaryPaint(map: maplibregl.Map, basemapMode: BasemapMode, minZoom: number) {
@@ -570,6 +577,7 @@ export default function ParcelMap() {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const parcelAbortRef = useRef<AbortController | null>(null);
   const parcelDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const parcelIdleLoadRef = useRef<(() => void) | null>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
   const basemapModeRef = useRef<BasemapMode>("streets");
   const activePanelRef = useRef<AppPanel>("map");
@@ -841,11 +849,15 @@ export default function ParcelMap() {
     if (!mapContainerRef.current || mapRef.current) return;
 
     const config = getMapConfig();
+    configureMapPerformance();
+
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: config.style,
       center: config.center,
       zoom: config.zoom,
+      refreshExpiredTiles: false,
+      maxTileCacheZoomLevels: MAP_TILE_CACHE_ZOOM_LEVELS,
       attributionControl: {
         compact: window.matchMedia("(max-width: 700px)").matches
       }
@@ -927,10 +939,33 @@ export default function ParcelMap() {
       }
     }
 
-    function queueVisibleParcelLoad(delay = 220) {
+    function cancelQueuedVisibleParcelLoad() {
       if (parcelDebounceRef.current) clearTimeout(parcelDebounceRef.current);
+      parcelDebounceRef.current = null;
+
+      if (parcelIdleLoadRef.current) {
+        map.off("idle", parcelIdleLoadRef.current);
+        parcelIdleLoadRef.current = null;
+      }
+    }
+
+    function queueVisibleParcelLoad(delay = 220) {
+      cancelQueuedVisibleParcelLoad();
       parcelDebounceRef.current = setTimeout(() => {
-        void loadVisibleParcels();
+        parcelDebounceRef.current = null;
+
+        const runVisibleParcelLoad = () => {
+          parcelIdleLoadRef.current = null;
+          void loadVisibleParcels();
+        };
+
+        if (map.areTilesLoaded()) {
+          runVisibleParcelLoad();
+          return;
+        }
+
+        parcelIdleLoadRef.current = runVisibleParcelLoad;
+        map.once("idle", runVisibleParcelLoad);
       }, delay);
     }
 
@@ -1258,7 +1293,7 @@ export default function ParcelMap() {
 
     return () => {
       parcelAbortRef.current?.abort();
-      if (parcelDebounceRef.current) clearTimeout(parcelDebounceRef.current);
+      cancelQueuedVisibleParcelLoad();
       map.remove();
       mapRef.current = null;
       streetLayerVisibilityRef.current = {};
