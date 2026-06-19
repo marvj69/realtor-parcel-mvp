@@ -30,10 +30,10 @@ const EMPTY_MEASUREMENT_COLLECTION: FeatureCollection<Geometry, MeasurementFeatu
 
 const PARCEL_TILE_SOURCE_ID = "parcel-tiles";
 const PARCEL_TILE_SOURCE_LAYER = "parcels";
-const SATELLITE_SOURCE_ID = "usgs-satellite";
-const SATELLITE_LAYER_ID = "usgs-satellite-layer";
-const SATELLITE_DETAIL_SOURCE_ID = "usgs-satellite-detail";
-const SATELLITE_DETAIL_LAYER_ID = "usgs-satellite-detail-layer";
+const SATELLITE_SOURCE_ID = "satellite-imagery";
+const SATELLITE_LAYER_ID = "satellite-imagery-layer";
+const SATELLITE_DETAIL_SOURCE_ID = "satellite-imagery-detail";
+const SATELLITE_DETAIL_LAYER_ID = "satellite-imagery-detail-layer";
 const SATELLITE_LAYER_IDS = [SATELLITE_LAYER_ID, SATELLITE_DETAIL_LAYER_ID];
 const PARCEL_TILE_FILL_LAYER_ID = "parcel-tile-fill";
 const PARCEL_TILE_LINE_LAYER_ID = "parcel-tile-line";
@@ -56,12 +56,12 @@ const DEFAULT_STREET_TILE_URL =
   "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}";
 const DEFAULT_STREET_ATTRIBUTION = "USGS The National Map: US Topo";
 const DEFAULT_SATELLITE_TILE_URL =
-  "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}";
-const DEFAULT_SATELLITE_DETAIL_TILE_URL =
-  "https://basemap.nationalmap.gov/arcgis/services/USGSImageryOnly/MapServer/WMSServer?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=0&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=1024&HEIGHT=1024&FORMAT=image/jpeg";
-const DEFAULT_SATELLITE_ATTRIBUTION = "USDA, USGS The National Map: Orthoimagery";
-const DEFAULT_SATELLITE_DETAIL_MIN_ZOOM = 15;
-const DEFAULT_SATELLITE_DETAIL_MAX_ZOOM = 22;
+  "https://imagery.michigan.gov/server/rest/services/Michigan_imagery_public/MapServer/tile/{z}/{y}/{x}";
+const DEFAULT_SATELLITE_MAX_ZOOM = 19;
+const DEFAULT_SATELLITE_DETAIL_TILE_URL: string | null = null;
+const DEFAULT_SATELLITE_ATTRIBUTION = "State of Michigan public imagery";
+const DEFAULT_SATELLITE_DETAIL_MIN_ZOOM = 19;
+const DEFAULT_SATELLITE_DETAIL_MAX_ZOOM = 19;
 const SATELLITE_DETAIL_FADE_ZOOM_DELTA = 0.75;
 const SELECTED_PARCEL_TOP_PADDING = 76;
 const SELECTED_PARCEL_SIDE_PADDING = 24;
@@ -197,11 +197,21 @@ function getStreetMapStyle(styleUrl: string | undefined): MapStyleConfig {
   };
 }
 
+function getDefaultSatelliteMaxZoom(tileUrl: string) {
+  return tileUrl.includes("/USGSImageryOnly/MapServer/tile/")
+    ? 16
+    : DEFAULT_SATELLITE_MAX_ZOOM;
+}
+
 function getMapConfig() {
   const centerRaw = process.env.NEXT_PUBLIC_DEFAULT_CENTER ?? "-88.5690,47.1211";
   const [lngRaw, latRaw] = centerRaw.split(",");
   const lng = Number(lngRaw);
   const lat = Number(latRaw);
+  const satelliteTileUrl = process.env.NEXT_PUBLIC_SATELLITE_TILE_URL ?? DEFAULT_SATELLITE_TILE_URL;
+  const satelliteMaxZoom = Number(
+    process.env.NEXT_PUBLIC_SATELLITE_MAX_ZOOM ?? getDefaultSatelliteMaxZoom(satelliteTileUrl)
+  );
   const satelliteDetailTileUrlEnv = process.env.NEXT_PUBLIC_SATELLITE_DETAIL_TILE_URL;
   const satelliteDetailMinZoom = Number(
     process.env.NEXT_PUBLIC_SATELLITE_DETAIL_MIN_ZOOM ?? DEFAULT_SATELLITE_DETAIL_MIN_ZOOM
@@ -212,7 +222,8 @@ function getMapConfig() {
 
   return {
     style: getStreetMapStyle(process.env.NEXT_PUBLIC_MAP_STYLE_URL),
-    satelliteTileUrl: process.env.NEXT_PUBLIC_SATELLITE_TILE_URL ?? DEFAULT_SATELLITE_TILE_URL,
+    satelliteTileUrl,
+    satelliteMaxZoom: Number.isFinite(satelliteMaxZoom) ? satelliteMaxZoom : getDefaultSatelliteMaxZoom(satelliteTileUrl),
     satelliteDetailTileUrl:
       satelliteDetailTileUrlEnv === "" ? null : satelliteDetailTileUrlEnv ?? DEFAULT_SATELLITE_DETAIL_TILE_URL,
     satelliteDetailMinZoom: Number.isFinite(satelliteDetailMinZoom)
@@ -969,7 +980,7 @@ export default function ParcelMap() {
         type: "raster",
         tiles: [config.satelliteTileUrl],
         tileSize: 256,
-        maxzoom: 16,
+        maxzoom: config.satelliteMaxZoom,
         attribution: config.satelliteAttribution
       });
 

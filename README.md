@@ -89,13 +89,13 @@ Street view defaults to a no-key USGS Topo raster service so the app does not
 depend on a third-party vector basemap. Set `NEXT_PUBLIC_MAP_STYLE_URL` only if
 you want to use a different authorized public MapLibre style URL.
 
-Satellite view defaults to no-key USGS ImageryOnly raster services. The cached
-tile layer handles normal zooms, and a WMS detail layer takes over when zoomed
-in so imagery does not have to stretch cached tiles. Override
-`NEXT_PUBLIC_SATELLITE_TILE_URL` or `NEXT_PUBLIC_SATELLITE_DETAIL_TILE_URL` if
+Satellite view defaults to the no-key State of Michigan public imagery tile
+cache, which is sharper for the Houghton County MVP area than the older USGS
+ImageryOnly cached basemap. Override `NEXT_PUBLIC_SATELLITE_TILE_URL`,
+`NEXT_PUBLIC_SATELLITE_MAX_ZOOM`, or `NEXT_PUBLIC_SATELLITE_DETAIL_TILE_URL` if
 you prefer a different authorized public tile source. Set
-`NEXT_PUBLIC_SATELLITE_DETAIL_TILE_URL` to an empty string to disable the
-high-zoom detail layer.
+`NEXT_PUBLIC_SATELLITE_DETAIL_TILE_URL` to an empty string to disable a
+separate high-zoom detail layer.
 
 Optional private-app auth is controlled by server-only env vars. Set `APP_AUTH_PASSWORD` and
 `APP_AUTH_SESSION_SECRET` in Vercel to require a signed session cookie for saved projects/parcels.
