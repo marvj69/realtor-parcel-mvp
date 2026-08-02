@@ -16,6 +16,7 @@ This MVP uses public county GIS parcel data. Refreshes should stay manual until 
 | Source key | County | Provider | Metadata check | Full refresh target | Triggered refresh |
 | --- | --- | --- | --- | --- | --- |
 | `houghton-mi-2024` | Houghton, MI | Houghton County / Colligo GIS public parcel layer | First business week of each month | First business week of January, April, July, and October | Refresh sooner if the county source date, feature count, field schema, or terms/disclaimer changes. |
+| `gladstone-mi-colligo` | Delta, MI | City of Gladstone / Colligo public GIS | First business week of each month | First business week of January, April, July, and October | Refresh sooner if the public project, 2026 assessment schema, feature count, or use terms change. Keep deployment private/internal unless broader reuse is confirmed. |
 
 ## Monthly metadata check
 

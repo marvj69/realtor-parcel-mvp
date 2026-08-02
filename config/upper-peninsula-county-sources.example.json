@@ -636,6 +636,68 @@
     }
   },
   {
+    "sourceKey": "gladstone-mi-colligo",
+    "provider": "City of Gladstone / Colligo public GIS",
+    "county": "Delta",
+    "state": "MI",
+    "sourceType": "colligo_public_layer",
+    "sourceUrl": "https://colligogis.com/desktop/#kRcFzC6ABm9Kt5ZU",
+    "publicLink": "kRcFzC6ABm9Kt5ZU",
+    "colligoLayerId": "1718306565",
+    "colligoUniqType": "poly1718306565",
+    "sourceProjection": "EPSG:3590",
+    "initialCenter": "-9688044.544142617,5756120.063577232",
+    "viewExtents": "-10100000,5500000,-9300000,6300000",
+    "sourceUpdatedAt": null,
+    "inputFile": "data/parcels/gladstone-mi-colligo.geojson",
+    "refreshCadence": "monthly metadata check; quarterly full refresh",
+    "lastRefreshReviewedAt": "2026-08-02",
+    "refreshNotes": "Supplemental city layer used to fill the Gladstone gap in the Delta County/CUPPAD FetchGIS source. The City links public parcel mapping, Colligo lists the layer as a public site, and the current layer exposes 2026 assessment fields. Keep use private/internal unless the City or Colligo confirms broader commercial reuse rights.",
+    "notes": "City assessor page: https://www.gladstonemi.gov/assessor. Public parcel layer: https://colligogis.com/public/. Colligo geometry is EPSG:3590 and is transformed to WGS84; int_findTabData enriches parcel attributes by ogr_fid.",
+    "fieldMap": {
+      "sourceFeatureId": [
+        "ogr_fid",
+        "ogrID",
+        "pnum"
+      ],
+      "parcelId": [
+        "pnum"
+      ],
+      "apn": [
+        "pnum"
+      ],
+      "ownerName": [
+        "ownername1"
+      ],
+      "siteAddress": [
+        "propstreetcombined"
+      ],
+      "mailingAddress": [
+        [
+          "ownerstreetaddr",
+          "ownercity",
+          "ownerstate",
+          "ownerzip"
+        ],
+        "ownerstreetaddr"
+      ],
+      "acreage": [
+        "totalacres"
+      ],
+      "assessedValue": [
+        "mborass",
+        "mborsev",
+        "landass"
+      ],
+      "landUse": [
+        "propclass"
+      ],
+      "legalDescription": [
+        "legal"
+      ]
+    }
+  },
+  {
     "sourceKey": "escanaba-mi-public-mapguide",
     "provider": "City of Escanaba public GIS / mPower MapGuide",
     "county": "Delta",

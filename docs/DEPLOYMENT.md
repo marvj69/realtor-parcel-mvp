@@ -17,6 +17,10 @@
 | `NEXT_PUBLIC_SATELLITE_DETAIL_MIN_ZOOM` | Optional | Vercel + local `.env.local` | Zoom where the high-detail satellite layer fades in. Defaults to `19`. |
 | `NEXT_PUBLIC_SATELLITE_DETAIL_MAX_ZOOM` | Optional | Vercel + local `.env.local` | Maximum source zoom for the high-detail satellite layer. Defaults to `19`. |
 | `NEXT_PUBLIC_SATELLITE_ATTRIBUTION` | Optional | Vercel + local `.env.local` | Public attribution text for satellite/aerial imagery. |
+| `NEXT_PUBLIC_SATELLITE_ROAD_LABEL_TILE_URL` | Optional | Vercel + local `.env.local` | Transparent public road and road-name tiles shown only in satellite mode. Defaults to the no-key ArcGIS World Transportation reference service; set to an empty string to disable. |
+| `NEXT_PUBLIC_SATELLITE_PLACE_LABEL_TILE_URL` | Optional | Vercel + local `.env.local` | Transparent public city/place-name tiles shown only in satellite mode. Defaults to the no-key ArcGIS World Boundaries and Places reference service; set to an empty string to disable. |
+| `NEXT_PUBLIC_SATELLITE_LABEL_MAX_ZOOM` | Optional | Vercel + local `.env.local` | Maximum source zoom for the satellite reference overlays. Defaults to `18`. |
+| `NEXT_PUBLIC_SATELLITE_LABEL_ATTRIBUTION` | Optional | Vercel + local `.env.local` | Attribution text for the satellite reference overlays. |
 | `NEXT_PUBLIC_DEFAULT_CENTER` | Yes | Vercel + local `.env.local` | `longitude,latitude` default map center. |
 | `NEXT_PUBLIC_DEFAULT_ZOOM` | Yes | Vercel + local `.env.local` | Default map zoom. |
 | `NEXT_PUBLIC_PARCEL_MIN_ZOOM` | Yes | Vercel + local `.env.local` | Client-side threshold before loading parcel outlines. |

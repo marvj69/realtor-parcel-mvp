@@ -196,7 +196,12 @@ async function insertParcelBatch(client: Client, records: ParcelImportRecord[]) 
       ${placeholders[0]}, ${placeholders[1]}, ${placeholders[2]}, ${placeholders[3]}, ${placeholders[4]},
       ${placeholders[5]}, ${placeholders[6]}, ${placeholders[7]}, ${placeholders[8]}, ${placeholders[9]},
       ${placeholders[10]}, ${placeholders[11]}, ${placeholders[12]}, ${placeholders[13]}, ${placeholders[14]}::bytea,
-      ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON(${placeholders[15]}), 4326))
+      ST_Multi(
+        ST_CollectionExtract(
+          ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(${placeholders[15]}), 4326)),
+          3
+        )
+      )
     )`;
   });
 

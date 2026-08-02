@@ -34,7 +34,16 @@ const SATELLITE_SOURCE_ID = "satellite-imagery";
 const SATELLITE_LAYER_ID = "satellite-imagery-layer";
 const SATELLITE_DETAIL_SOURCE_ID = "satellite-imagery-detail";
 const SATELLITE_DETAIL_LAYER_ID = "satellite-imagery-detail-layer";
-const SATELLITE_LAYER_IDS = [SATELLITE_LAYER_ID, SATELLITE_DETAIL_LAYER_ID];
+const SATELLITE_ROAD_LABEL_SOURCE_ID = "satellite-road-labels";
+const SATELLITE_ROAD_LABEL_LAYER_ID = "satellite-road-labels-layer";
+const SATELLITE_PLACE_LABEL_SOURCE_ID = "satellite-place-labels";
+const SATELLITE_PLACE_LABEL_LAYER_ID = "satellite-place-labels-layer";
+const SATELLITE_LAYER_IDS = [
+  SATELLITE_LAYER_ID,
+  SATELLITE_DETAIL_LAYER_ID,
+  SATELLITE_ROAD_LABEL_LAYER_ID,
+  SATELLITE_PLACE_LABEL_LAYER_ID
+];
 const PARCEL_TILE_FILL_LAYER_ID = "parcel-tile-fill";
 const PARCEL_TILE_LINE_LAYER_ID = "parcel-tile-line";
 const PARCEL_GEOJSON_FILL_LAYER_ID = "parcel-fill";
@@ -62,6 +71,13 @@ const DEFAULT_SATELLITE_DETAIL_TILE_URL: string | null = null;
 const DEFAULT_SATELLITE_ATTRIBUTION = "State of Michigan public imagery";
 const DEFAULT_SATELLITE_DETAIL_MIN_ZOOM = 19;
 const DEFAULT_SATELLITE_DETAIL_MAX_ZOOM = 19;
+const DEFAULT_SATELLITE_ROAD_LABEL_TILE_URL =
+  "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}";
+const DEFAULT_SATELLITE_PLACE_LABEL_TILE_URL =
+  "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
+const DEFAULT_SATELLITE_LABEL_MAX_ZOOM = 18;
+const DEFAULT_SATELLITE_LABEL_ATTRIBUTION =
+  "Esri, HERE, Garmin, OpenStreetMap contributors, and the GIS user community";
 const SATELLITE_DETAIL_FADE_ZOOM_DELTA = 0.75;
 const MAPLIBRE_WORKER_LIMIT = 4;
 const MAP_TILE_CACHE_ZOOM_LEVELS = 8;
@@ -226,6 +242,11 @@ function getMapConfig() {
   const satelliteDetailMaxZoom = Number(
     process.env.NEXT_PUBLIC_SATELLITE_DETAIL_MAX_ZOOM ?? DEFAULT_SATELLITE_DETAIL_MAX_ZOOM
   );
+  const satelliteRoadLabelTileUrlEnv = process.env.NEXT_PUBLIC_SATELLITE_ROAD_LABEL_TILE_URL;
+  const satellitePlaceLabelTileUrlEnv = process.env.NEXT_PUBLIC_SATELLITE_PLACE_LABEL_TILE_URL;
+  const satelliteLabelMaxZoom = Number(
+    process.env.NEXT_PUBLIC_SATELLITE_LABEL_MAX_ZOOM ?? DEFAULT_SATELLITE_LABEL_MAX_ZOOM
+  );
 
   return {
     style: getStreetMapStyle(process.env.NEXT_PUBLIC_MAP_STYLE_URL),
@@ -239,6 +260,19 @@ function getMapConfig() {
     satelliteDetailMaxZoom: Number.isFinite(satelliteDetailMaxZoom)
       ? satelliteDetailMaxZoom
       : DEFAULT_SATELLITE_DETAIL_MAX_ZOOM,
+    satelliteRoadLabelTileUrl:
+      satelliteRoadLabelTileUrlEnv === ""
+        ? null
+        : satelliteRoadLabelTileUrlEnv ?? DEFAULT_SATELLITE_ROAD_LABEL_TILE_URL,
+    satellitePlaceLabelTileUrl:
+      satellitePlaceLabelTileUrlEnv === ""
+        ? null
+        : satellitePlaceLabelTileUrlEnv ?? DEFAULT_SATELLITE_PLACE_LABEL_TILE_URL,
+    satelliteLabelMaxZoom: Number.isFinite(satelliteLabelMaxZoom)
+      ? satelliteLabelMaxZoom
+      : DEFAULT_SATELLITE_LABEL_MAX_ZOOM,
+    satelliteLabelAttribution:
+      process.env.NEXT_PUBLIC_SATELLITE_LABEL_ATTRIBUTION ?? DEFAULT_SATELLITE_LABEL_ATTRIBUTION,
     satelliteAttribution: process.env.NEXT_PUBLIC_SATELLITE_ATTRIBUTION ?? DEFAULT_SATELLITE_ATTRIBUTION,
     center: [Number.isFinite(lng) ? lng : -88.569, Number.isFinite(lat) ? lat : 47.1211] as [number, number],
     zoom: Number(process.env.NEXT_PUBLIC_DEFAULT_ZOOM ?? 13)
@@ -1070,6 +1104,52 @@ export default function ParcelMap() {
               1
             ],
             "raster-resampling": "linear"
+          }
+        });
+      }
+
+      if (config.satelliteRoadLabelTileUrl) {
+        map.addSource(SATELLITE_ROAD_LABEL_SOURCE_ID, {
+          type: "raster",
+          tiles: [config.satelliteRoadLabelTileUrl],
+          tileSize: 256,
+          maxzoom: config.satelliteLabelMaxZoom,
+          attribution: config.satelliteLabelAttribution
+        });
+
+        map.addLayer({
+          id: SATELLITE_ROAD_LABEL_LAYER_ID,
+          type: "raster",
+          source: SATELLITE_ROAD_LABEL_SOURCE_ID,
+          layout: {
+            visibility: basemapModeRef.current === "satellite" ? "visible" : "none"
+          },
+          paint: {
+            "raster-fade-duration": 0,
+            "raster-opacity": 1
+          }
+        });
+      }
+
+      if (config.satellitePlaceLabelTileUrl) {
+        map.addSource(SATELLITE_PLACE_LABEL_SOURCE_ID, {
+          type: "raster",
+          tiles: [config.satellitePlaceLabelTileUrl],
+          tileSize: 256,
+          maxzoom: config.satelliteLabelMaxZoom,
+          attribution: config.satelliteLabelAttribution
+        });
+
+        map.addLayer({
+          id: SATELLITE_PLACE_LABEL_LAYER_ID,
+          type: "raster",
+          source: SATELLITE_PLACE_LABEL_SOURCE_ID,
+          layout: {
+            visibility: basemapModeRef.current === "satellite" ? "visible" : "none"
+          },
+          paint: {
+            "raster-fade-duration": 0,
+            "raster-opacity": 1
           }
         });
       }

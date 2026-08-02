@@ -61,6 +61,9 @@
 - [x] Import full Houghton County source into Neon/PostGIS under `houghton-mi-2024`.
 - [x] Remove the 25-feature sample and fictional seed sources from Neon to avoid duplicate/fabricated production parcels.
 - [x] Validate full source via production `/api/parcels/bbox`, `/api/parcels/search`, and `/api/parcels/lookup`.
+- [x] Audit covered Upper Peninsula municipality centers for parcel gaps; Gladstone was the only material incorporated-place gap.
+- [x] Add and import the City of Gladstone public Colligo supplement: 2,767 parcels with 2026 assessment fields.
+- [x] Repair invalid source polygons during import with PostGIS `ST_MakeValid` and validate the Gladstone source at zero invalid/empty geometries.
 
 ## Realtor-specific features
 
@@ -91,7 +94,9 @@
 - GitHub repo: `https://github.com/marvj69/realtor-parcel-mvp`
 - `main` is pushed to GitHub and Vercel production deploys from it.
 - Neon/PostGIS is working in local and production API routes.
-- Production Neon currently contains `houghton-mi-2024` with 28,602 Houghton County parcels.
+- Production Neon currently contains 232,191 parcels across 15 public sources covering 12 Upper Peninsula counties, including city supplements for Gladstone, Escanaba, and Marquette.
+- Gladstone's 2,767-parcel city supplement fills the Delta County/CUPPAD city-center gap; the county layer continues to cover the surrounding municipality areas.
+- Satellite mode includes transparent no-key city/place and road-name reference overlays above Michigan public imagery.
 - Latest Houghton performance/search pass adds zoom-aware loading, server-side simplification, hard bbox caps, and search UI.
 - Auth/ownership pass adds `/api/auth/session`, server-only private-app auth env vars, and owner-scoped saved projects/parcels.
 - Current development pass adds saved-project sidebar UI, MapLibre vector tiles, ranked/autocomplete search, and API hardening.

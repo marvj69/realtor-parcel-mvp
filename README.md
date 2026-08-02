@@ -90,12 +90,14 @@ depend on a third-party vector basemap. Set `NEXT_PUBLIC_MAP_STYLE_URL` only if
 you want to use a different authorized public MapLibre style URL.
 
 Satellite view defaults to the no-key State of Michigan public imagery tile
-cache, which is sharper for the Houghton County MVP area than the older USGS
-ImageryOnly cached basemap. Override `NEXT_PUBLIC_SATELLITE_TILE_URL`,
+cache, with transparent public road-name and place-name reference overlays so
+the imagery remains navigable. Override `NEXT_PUBLIC_SATELLITE_TILE_URL`,
 `NEXT_PUBLIC_SATELLITE_MAX_ZOOM`, or `NEXT_PUBLIC_SATELLITE_DETAIL_TILE_URL` if
-you prefer a different authorized public tile source. Set
-`NEXT_PUBLIC_SATELLITE_DETAIL_TILE_URL` to an empty string to disable a
-separate high-zoom detail layer.
+you prefer a different authorized public tile source. The reference overlays
+can be overridden with `NEXT_PUBLIC_SATELLITE_ROAD_LABEL_TILE_URL` and
+`NEXT_PUBLIC_SATELLITE_PLACE_LABEL_TILE_URL`; set an individual URL to an empty
+string to disable it. Set `NEXT_PUBLIC_SATELLITE_DETAIL_TILE_URL` to an empty
+string to disable a separate high-zoom detail layer.
 
 Optional private-app auth is controlled by server-only env vars. Set `APP_AUTH_PASSWORD` and
 `APP_AUTH_SESSION_SECRET` in Vercel to require a signed session cookie for saved projects/parcels.
