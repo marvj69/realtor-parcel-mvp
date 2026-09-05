@@ -12,30 +12,42 @@
     "db:compact": "tsx scripts/compact-parcel-storage.ts",
     "db:seed": "tsx scripts/apply-schema.ts db/seed.sql",
     "parcels:fetch": "tsx scripts/fetch-arcgis-layer.ts",
-    "parcels:import": "tsx scripts/import-parcels-from-geojson.ts"
+    "parcels:import": "tsx scripts/import-parcels-from-geojson.ts",
+    "parcels:export-static": "tsx scripts/export-static-parcels.ts",
+    "test:static": "tsx --test tests/static-parcels.test.ts",
+    "parcels:prune": "tsx scripts/prune-static-parcels.ts",
+    "parcels:restore": "tsx scripts/restore-static-parcels.ts",
+    "parcels:verify-static": "tsx scripts/verify-static-parcels.ts"
   },
   "dependencies": {
     "@turf/turf": "latest",
     "dotenv": "latest",
+    "geojson-vt": "^5.0.2",
     "maplibre-gl": "latest",
     "next": "latest",
     "pg": "latest",
     "react": "latest",
     "react-dom": "latest",
     "server-only": "^0.0.1",
+    "vt-pbf": "^3.1.3",
     "zod": "latest"
   },
   "devDependencies": {
     "@eslint/eslintrc": "latest",
     "@types/geojson": "latest",
+    "@types/geojson-vt": "^3.2.5",
     "@types/node": "latest",
     "@types/pg": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "@types/vt-pbf": "^3.1.1",
     "eslint": "latest",
     "eslint-config-next": "latest",
     "proj4": "^2.20.8",
     "tsx": "latest",
     "typescript": "latest"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }

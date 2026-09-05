@@ -2,6 +2,16 @@
 
 A low-cost, local-first MVP for a realtor-focused parcel intelligence map.
 
+## Current storage architecture
+
+The bulk parcel dataset is an encrypted, read-only deployment asset. Map lookup,
+search, bbox downloads and vector tiles read indexed local files in Vercel
+functions. Neon stores accounts, projects, notes and snapshots of saved parcels.
+See [Static parcel migration and refresh runbook](docs/STATIC_PARCELS.md).
+
+The original setup/import instructions below apply to a scratch PostGIS import
+workspace. Bulk imports into the small production user-data backend are blocked.
+
 This starter is designed for GitHub + Vercel + Neon and gives a coding agent enough structure to begin building immediately.
 
 ## What this MVP does

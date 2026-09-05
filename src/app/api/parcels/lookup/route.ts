@@ -1,3 +1,4 @@
+import { hasStaticParcels, getStaticParcels } from "@/lib/static-parcels";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { apiRateLimits, withApiGuard } from "@/lib/api-guard";
@@ -26,6 +27,11 @@ async function lookupParcel(request: Request) {
   }
 
   const { lat, lng } = parsed.data;
+
+  if (hasStaticParcels()) {
+    const store = await getStaticParcels();
+    return NextResponse.json({ ok: true, data: store.lookup(lng, lat), storage: "static" });
+  }
 
   if (!hasDatabaseConfig()) {
     return NextResponse.json({ ok: true, data: getDemoParcelByPoint(lng, lat), demo: true });

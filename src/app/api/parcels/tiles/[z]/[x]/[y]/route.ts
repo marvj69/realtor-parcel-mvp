@@ -1,3 +1,4 @@
+import { hasStaticParcels, getStaticParcels } from "@/lib/static-parcels";
 import { NextResponse } from "next/server";
 import { apiRateLimits, withApiGuard } from "@/lib/api-guard";
 import { query } from "@/lib/db";
@@ -52,6 +53,15 @@ async function getParcelTile(_request: Request, context: TileRouteContext) {
       "X-Parcel-Tile-Min-Zoom": String(policy.minZoom),
       "X-Parcel-Tile-Reason": "below-min-zoom"
     });
+  }
+
+  if (hasStaticParcels()) {
+    const store = await getStaticParcels();
+    const tile = store.tile(z, x, y);
+    const headers = tileHeaders({ "X-Parcel-Storage": "static", "X-Parcel-Dataset": store.manifest!.version });
+    // Guarded data must not be served from a shared cache before authentication.
+    headers["Cache-Control"] = "private, max-age=3600";
+    return tile ? new Response(tileBody(Buffer.from(tile)), { headers }) : new Response(null, { status: 204, headers });
   }
 
   if (!hasDatabaseConfig()) {

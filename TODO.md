@@ -1,3 +1,15 @@
+# Static parcel migration
+
+- [x] Export and verify all 232,191 parcels across 15 sources.
+- [x] Serve tiles, lookup, search and bbox from encrypted read-only deployment files.
+- [x] Keep saved parcel UUIDs, projects, account ownership and notes in Neon.
+- [x] Preserve original source attributes in an encrypted recovery archive.
+- [x] Verify 45 live sample locations, saved work, account isolation, and browser map rendering.
+- [x] Provide guarded prune, restore, and refresh workflows in docs/STATIC_PARCELS.md.
+
+The checklist below records the earlier PostGIS MVP history. Current data storage
+and deployment instructions are in docs/STATIC_PARCELS.md.
+
 # MVP Todo
 
 ## Now

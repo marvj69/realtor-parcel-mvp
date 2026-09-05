@@ -270,6 +270,11 @@ async function main() {
   });
 
   await client.connect();
+  const staticKeys = await client.query("SELECT to_regclass('public.parcel_dataset_keys') AS table_name");
+  if (staticKeys.rows[0]?.table_name) {
+    await client.end();
+    throw new Error("This is the small user-data backend. Import into a scratch PostGIS database, then export a new static dataset; see docs/STATIC_PARCELS.md.");
+  }
 
   try {
     await client.query("BEGIN");

@@ -1,3 +1,4 @@
+import { hasStaticParcels, getStaticParcels } from "@/lib/static-parcels";
 import { NextResponse } from "next/server";
 import { apiRateLimits, withApiGuard } from "@/lib/api-guard";
 import { isPrivateAuthEnabled } from "@/lib/auth";
@@ -24,7 +25,10 @@ async function getHealth() {
     const [row] = await query<{ now: string; postgis_version: string }>(
       "SELECT now()::text AS now, PostGIS_Version() AS postgis_version"
     );
-    return NextResponse.json({ ok: true, data: { ...row, auth_enabled: isPrivateAuthEnabled() } });
+    const dataset = hasStaticParcels() ? await getStaticParcels() : null;
+    return NextResponse.json({ ok: true, data: { ...row, auth_enabled: isPrivateAuthEnabled(),
+      parcel_storage: dataset ? "static" : "postgis", parcel_count: dataset?.count,
+      dataset_version: dataset?.manifest?.version } });
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: err instanceof Error ? err.message : "Database health check failed" },

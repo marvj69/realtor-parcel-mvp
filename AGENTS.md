@@ -22,7 +22,7 @@ The MVP should let a realtor:
 
 - Use the existing stack: GitHub, Vercel, Neon.
 - Use MapLibre for mapping.
-- Use Neon Postgres with PostGIS for parcel geometry.
+- Serve the full parcel dataset from encrypted immutable deployment assets (see docs/STATIC_PARCELS.md). Use Neon/PostGIS only for accounts, projects, notes, source metadata, keys, and saved parcel snapshots. Do not bulk-import into the production backend.
 - Keep operating cost near-free.
 - Do not use Regrid, ATTOM, Mapbox, Google Maps, or other paid APIs unless the owner explicitly authorizes it.
 - Do not fabricate parcel data.

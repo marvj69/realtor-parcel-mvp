@@ -1,0 +1,32 @@
+{
+  "format": 1,
+  "version": "20260905170024088",
+  "createdAt": "2026-09-05T17:11:30.533Z",
+  "count": 232191,
+  "sourceCounts": {
+    "alger-mi-colligo": 12625,
+    "baraga-mi-public": 10884,
+    "delta-mi-fetchgis": 22528,
+    "dickinson-mi-colligo": 26484,
+    "escanaba-mi-public-mapguide": 5611,
+    "gladstone-mi-colligo": 2767,
+    "gogebic-mi-public": 6681,
+    "houghton-mi-2024": 28602,
+    "iron-mi-public": 20427,
+    "keweenaw-mi-2024": 4759,
+    "marquette-city-mi-public": 6718,
+    "marquette-mi-fetchgis": 39536,
+    "menominee-mi-colligo": 23958,
+    "ontonagon-mi-public": 7118,
+    "schoolcraft-mi-2024": 13493
+  },
+  "sqliteBytes": 259997696,
+  "sha256": "20e02492aada38b262362a54bcc667ece15408681e67cac09c3b6a22d1a88ff0",
+  "parts": [
+    "20260905170024088.0.enc",
+    "20260905170024088.1.enc",
+    "20260905170024088.2.enc"
+  ],
+  "iv": "3976ac8a3763f483f00676dc",
+  "tag": "5ef9bbfcc7affb3aed4cd95d8a99931b"
+}

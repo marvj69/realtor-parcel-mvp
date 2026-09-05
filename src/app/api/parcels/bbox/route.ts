@@ -1,3 +1,4 @@
+import { hasStaticParcels, getStaticParcels } from "@/lib/static-parcels";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { apiRateLimits, withApiGuard } from "@/lib/api-guard";
@@ -100,6 +101,20 @@ async function getParcelBbox(request: Request) {
       zoom,
       shouldLoad: false,
       message: "Zoom in to view parcels."
+    });
+  }
+
+  if (hasStaticParcels()) {
+    const store = await getStaticParcels();
+    const box: [number, number, number, number] = [minLng, minLat, maxLng, maxLat];
+    const count = store.countBbox(box);
+    const tooMany = !metadataOnly && count > policy.limit;
+    return NextResponse.json({
+      ok: true, storage: "static", count, limit: policy.limit, minZoom: MIN_PARCEL_ZOOM, zoom,
+      data: metadataOnly || tooMany ? { type: "FeatureCollection", features: [] } : store.bbox(box, policy.limit, policy.tolerance),
+      shouldLoad: !tooMany, tooMany, simplified: policy.simplified, vectorTiles: metadataOnly,
+      message: tooMany ? `Too many parcels in view (${count.toLocaleString()}). Zoom in to view parcel boundaries.`
+        : `${count.toLocaleString()} parcels in view. Tap or click a parcel for details.`
     });
   }
 

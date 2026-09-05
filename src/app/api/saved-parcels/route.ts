@@ -1,3 +1,4 @@
+import { retainSavedParcel } from "@/lib/retain-saved-parcel";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { apiRateLimits, withApiGuard } from "@/lib/api-guard";
@@ -224,6 +225,10 @@ async function saveParcel(request: Request) {
   try {
     await client.query("BEGIN");
     await ensureAppUser(user, client);
+    if (!await retainSavedParcel(client, parcelDatabaseId)) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ ok: false, error: "Parcel not found" }, { status: 404 });
+    }
 
     const projectResult = await client.query<{ id: string }>(
       `

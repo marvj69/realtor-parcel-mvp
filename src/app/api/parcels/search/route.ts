@@ -1,3 +1,4 @@
+import { hasStaticParcels, getStaticParcels } from "@/lib/static-parcels";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { apiRateLimits, withApiGuard } from "@/lib/api-guard";
@@ -45,6 +46,11 @@ async function searchParcels(request: Request) {
   const prefixPattern = `${escapedQuery}%`;
   const normalizedQuery = q.toLowerCase().replace(/[^a-z0-9]/g, "");
   const normalizedPrefixPattern = normalizedQuery ? `${normalizedQuery}%` : "__never_match__";
+
+  if (hasStaticParcels()) {
+    const store = await getStaticParcels();
+    return NextResponse.json({ ok: true, data: store.search(q, limit), mode, storage: "static" });
+  }
 
   if (!hasDatabaseConfig()) {
     return NextResponse.json({ ok: true, data: searchDemoParcels(q, limit), demo: true, mode });

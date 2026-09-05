@@ -16,3 +16,8 @@ data/parcels/*.geojson
 data/parcels/*.json
 data/parcels/*.zip
 .env*.local
+
+work/
+*.sqlite
+data/static-parcels/*.tmp
+data/parcel-archive/*.tmp
