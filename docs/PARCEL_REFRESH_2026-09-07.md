@@ -34,6 +34,8 @@ count raw-only attribute changes, new features or geometry changes.
 
 ## Source and import findings
 
+- Tile URLs include the deployment dataset version, so a new release does not
+  reuse browser-cached outlines from the prior dataset after the app is reopened.
 - Current source URLs and field mappings are in
   `config/upper-peninsula-county-sources.example.json`; Houghton's existing local
   config remains unchanged. All 15 feeds were downloaded for comparison.

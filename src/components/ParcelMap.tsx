@@ -1162,7 +1162,7 @@ export default function ParcelMap() {
       if (parcelLayerConfig.vectorTilesEnabled) {
         map.addSource(PARCEL_TILE_SOURCE_ID, {
           type: "vector",
-          tiles: [`${window.location.origin}/api/parcels/tiles/{z}/{x}/{y}`],
+          tiles: [`${window.location.origin}/api/parcels/tiles/{z}/{x}/{y}?v=${process.env.NEXT_PUBLIC_PARCEL_DATASET_VERSION}`],
           minzoom: parcelLayerConfig.minZoom,
           maxzoom: 22
         });
