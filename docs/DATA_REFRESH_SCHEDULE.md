@@ -29,37 +29,34 @@ This MVP uses public county GIS parcel data. Refreshes should stay manual until 
 
 ## Full refresh runbook
 
-1. Update `config/county-sources.local.json` with the latest `sourceUrl`, `sourceUpdatedAt`, `notes`, field mappings, and refresh metadata.
-2. Fetch the source into an ignored local file:
+The production Neon database contains user data and saved snapshots only. Do not
+run bulk imports or the historical schema/seed workflow against it. Follow
+[STATIC_PARCELS.md](STATIC_PARCELS.md) for the encrypted deployment architecture.
 
-```bash
-npm run parcels:fetch -- --config=config/county-sources.local.json --source=houghton-mi-2024
-```
+1. Review the current public source, field names, terms and update metadata.
+   Download to a new ignored comparison directory, preserving prior source files.
+2. Compare complete records with the deployed runtime and recovery archive.
+   Service modification timestamps alone do not establish a newer assessor roll.
+3. Restore the prior parcel dataset into a separate scratch PostGIS database.
+   Explicitly set both `DATABASE_URL` and `DATABASE_DIRECT_URL` to scratch for
+   imports; never let a missing scratch value fall back to `.env.local`.
+4. Import changed sources in scratch and validate normalized fields, source counts,
+   empty/invalid geometry, duplicate identifiers and coverage at prior locations.
+5. Preserve parcel UUIDs by verified identity. If a provider regenerates OBJECTID
+   or ogr_fid, match parcel numbers and geometry rather than reusing an ID for a
+   different property. Review duplicate parcel numbers, splits and consolidations.
+   Verify every existing saved parcel and keep saved snapshots intact.
+6. Export the complete dataset with `PARCEL_KEY_DATABASE_URL` pointing to the small
+   Neon backend. Review any intentional count reduction before using
+   `--allow-smaller-dataset`. Keep the previous encrypted release and its key.
+7. Verify runtime/archive checksums and integrity, source counts, sampled lookup,
+   search, bbox and tiles against scratch. Run typecheck, lint, tests and build.
+8. Deploy the complete manifest and matching encrypted chunks atomically. Verify
+   the exact live dataset version, parcel count, authentication and map APIs.
+9. Record source changes, excluded records, validation evidence and limitations.
+   Compare user-data hashes before/after. Stop the temporary scratch server.
 
-3. Inspect the downloaded feature count and spot-check raw properties before importing.
-4. Apply schema updates first if the database has not been migrated recently:
-
-```bash
-npm run db:schema
-```
-
-5. Import into Neon/PostGIS:
-
-```bash
-npm run parcels:import -- --config=config/county-sources.local.json --source=houghton-mi-2024 --batchSize=500
-```
-
-6. Validate the refreshed source:
-
-```bash
-npm run typecheck
-npm run lint
-npm run build
-```
-
-7. Smoke-test `/api/health`, `/api/parcels/bbox?metadataOnly=1`, `/api/parcels/search`, `/api/parcels/lookup`, and the map click/highlight flow.
-8. Confirm the UI still shows the parcel-boundary disclaimer.
-9. Record the import date, source date, feature count, validation notes, and any source limitations in the project notes or release summary.
+Latest review: [September 7, 2026 refresh](PARCEL_REFRESH_2026-09-07.md).
 
 ## Automation gate
 

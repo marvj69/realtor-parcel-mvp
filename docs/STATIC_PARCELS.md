@@ -57,7 +57,10 @@ Recheck county-source terms and metadata before every refresh. Imports into the
 small production backend are deliberately blocked. Import into a temporary/scratch
 PostGIS database instead, using the existing fetch/import scripts. Preserve UUIDs
 for unchanged `(source_key, source_feature_id)` pairs from the prior dataset before
-exporting, so users' saved parcel references remain stable. Set
+exporting, so users' saved parcel references remain stable. If a source has
+regenerated those feature IDs, verify parcel-number and geometry identity first;
+never assign an existing UUID to a different property just because an OBJECTID
+was reused. See the September 2026 refresh report for this case. Set
 `PARCEL_KEY_DATABASE_URL` to the small production backend when exporting from
 scratch; `DATABASE_DIRECT_URL`/`DATABASE_URL` select the source DB. Keep these
 variables private. The exporter refuses a smaller dataset unless an intentional

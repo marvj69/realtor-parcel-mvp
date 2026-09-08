@@ -274,9 +274,12 @@ async function fetchArcgisSource(source: CountySource): Promise<FeatureCollectio
     }
 
     allFeatures.push(...pageCollection.features as Feature[]);
-    if (pageCollection.features.length === 0) break;
-    offset += pageCollection.features.length;
-    if (pageCollection.features.length < pageSize && !payload.exceededTransferLimit) break;
+    // Offsets count source records, including rows without polygon geometry.
+    // Using the converted count repeats boundary rows after a skipped geometry.
+    const sourceRecordCount = payload.features?.length ?? 0;
+    if (sourceRecordCount === 0) break;
+    offset += sourceRecordCount;
+    if (sourceRecordCount < pageSize && !payload.exceededTransferLimit) break;
   }
 
   return {

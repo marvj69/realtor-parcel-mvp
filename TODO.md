@@ -106,7 +106,7 @@ and deployment instructions are in docs/STATIC_PARCELS.md.
 - GitHub repo: `https://github.com/marvj69/realtor-parcel-mvp`
 - `main` is pushed to GitHub and Vercel production deploys from it.
 - Neon/PostGIS is working in local and production API routes.
-- Production Neon currently contains 232,191 parcels across 15 public sources covering 12 Upper Peninsula counties, including city supplements for Gladstone, Escanaba, and Marquette.
+- Encrypted deployment assets contain 230,386 parcel features across 15 public sources covering 12 Upper Peninsula counties, including city supplements for Gladstone, Escanaba, and Marquette. See docs/PARCEL_REFRESH_2026-09-07.md for the latest source review; Neon retains user data and saved snapshots.
 - Gladstone's 2,767-parcel city supplement fills the Delta County/CUPPAD city-center gap; the county layer continues to cover the surrounding municipality areas.
 - Satellite mode includes transparent no-key city/place and road-name reference overlays above Michigan public imagery.
 - Latest Houghton performance/search pass adds zoom-aware loading, server-side simplification, hard bbox caps, and search UI.

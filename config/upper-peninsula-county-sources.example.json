@@ -9,7 +9,7 @@
     "sourceUpdatedAt": "2024-04-25T00:00:00.000Z",
     "inputFile": "data/parcels/keweenaw-mi-2024.geojson",
     "refreshCadence": "monthly metadata check; quarterly full refresh",
-    "lastRefreshReviewedAt": null,
+    "lastRefreshReviewedAt": "2026-09-07",
     "refreshNotes": "Private personal MVP import from the public Keweenaw parcel FeatureServer. Verify county terms before any commercial reuse.",
     "notes": "Public parcel layer supports GeoJSON and outSR=4326.",
     "fieldMap": {
@@ -76,7 +76,7 @@
     "sourceUpdatedAt": "2023-12-01T17:37:13.000Z",
     "inputFile": "data/parcels/ontonagon-mi-public.geojson",
     "refreshCadence": "monthly metadata check; quarterly full refresh",
-    "lastRefreshReviewedAt": null,
+    "lastRefreshReviewedAt": "2026-09-07",
     "refreshNotes": "Private personal MVP import from a public parcel FeatureServer. Verify county terms before any commercial reuse.",
     "notes": "Public layer has parcel id, owner-like parcel master fields, mailing fields, and acreage.",
     "fieldMap": {
@@ -134,7 +134,7 @@
     "sourceUpdatedAt": null,
     "inputFile": "data/parcels/baraga-mi-public.geojson",
     "refreshCadence": "monthly metadata check; quarterly full refresh",
-    "lastRefreshReviewedAt": null,
+    "lastRefreshReviewedAt": "2026-09-07",
     "refreshNotes": "Private personal MVP import from a public parcel FeatureServer. Verify county terms before any commercial reuse.",
     "notes": "Public layer is geometry-first and only exposes parcel id and property address attributes.",
     "fieldMap": {
@@ -169,7 +169,7 @@
     "sourceUpdatedAt": "2023-12-04T14:47:39.000Z",
     "inputFile": "data/parcels/gogebic-mi-public.geojson",
     "refreshCadence": "monthly metadata check; quarterly full refresh",
-    "lastRefreshReviewedAt": null,
+    "lastRefreshReviewedAt": "2026-09-07",
     "refreshNotes": "Private personal MVP import from a public parcel FeatureServer. Verify county terms before any commercial reuse.",
     "notes": "Public layer has parcel id, owner, and mailing fields; no site address or acreage field was exposed.",
     "fieldMap": {
@@ -223,7 +223,7 @@
     "sourceUpdatedAt": null,
     "inputFile": "data/parcels/marquette-mi-fetchgis.geojson",
     "refreshCadence": "monthly metadata check; quarterly full refresh",
-    "lastRefreshReviewedAt": null,
+    "lastRefreshReviewedAt": "2026-09-07",
     "refreshNotes": "Private personal MVP import from county-linked FetchGIS public parcel layer. Verify county or FetchGIS terms before any commercial reuse.",
     "notes": "FetchGIS proxy returns ArcGIS JSON in Web Mercator, then the fetch script converts geometry to WGS84 GeoJSON.",
     "fieldMap": {
@@ -307,7 +307,7 @@
     "sourceUpdatedAt": "2026-03-26T14:55:17.017Z",
     "inputFile": "data/parcels/marquette-city-mi-public.geojson",
     "refreshCadence": "monthly metadata check; quarterly full refresh",
-    "lastRefreshReviewedAt": null,
+    "lastRefreshReviewedAt": "2026-09-07",
     "refreshNotes": "Supplemental City of Marquette public GIS parcel layer used to fill city-center parcel coverage gaps in the county FetchGIS layer. Verify city/county terms before commercial reuse.",
     "notes": "City zoning map viewer parcel layer exposes real PARCEL_ID values, owner name/address fields, site address fields, legal description, property class, and Web Mercator geometry returned as WGS84 GeoJSON by the ArcGIS query.",
     "fieldMap": {
@@ -379,7 +379,7 @@
     "sourceUpdatedAt": null,
     "inputFile": "data/parcels/iron-mi-colligo.geojson",
     "refreshCadence": "monthly metadata check; quarterly full refresh",
-    "lastRefreshReviewedAt": null,
+    "lastRefreshReviewedAt": "2026-09-07",
     "refreshNotes": "Private personal MVP import from county-linked Colligo public GIS. Verify county or Colligo terms before any commercial reuse.",
     "notes": "Colligo geometry is EPSG:2896 and is transformed to WGS84; int_findTabData enriches parcel attributes by ogr_fid.",
     "fieldMap": {
@@ -444,7 +444,7 @@
     "sourceUpdatedAt": null,
     "inputFile": "data/parcels/alger-mi-colligo.geojson",
     "refreshCadence": "monthly metadata check; quarterly full refresh",
-    "lastRefreshReviewedAt": null,
+    "lastRefreshReviewedAt": "2026-09-07",
     "refreshNotes": "Private personal MVP import from county-linked Colligo public GIS. Verify county or Colligo terms before any commercial reuse.",
     "notes": "Colligo loadData geometry is WGS84; int_findTabData enriches parcel attributes by ogr_fid.",
     "fieldMap": {
@@ -498,7 +498,7 @@
     "sourceUpdatedAt": "2024-08-30T00:00:00.000Z",
     "inputFile": "data/parcels/schoolcraft-mi-2024.geojson",
     "refreshCadence": "monthly metadata check; quarterly full refresh",
-    "lastRefreshReviewedAt": null,
+    "lastRefreshReviewedAt": "2026-09-07",
     "refreshNotes": "Private personal MVP import from a public Schoolcraft parcel FeatureServer. Verify county terms before any commercial reuse.",
     "notes": "Public layer exposes parcel id, owner, mailing address, property class, and legal description fields.",
     "fieldMap": {
@@ -551,7 +551,7 @@
     "sourceUpdatedAt": null,
     "inputFile": "data/parcels/dickinson-mi-colligo.geojson",
     "refreshCadence": "monthly metadata check; quarterly full refresh",
-    "lastRefreshReviewedAt": null,
+    "lastRefreshReviewedAt": "2026-09-07",
     "refreshNotes": "Private personal MVP import from county-linked Colligo public GIS. Verify county or Colligo terms before any commercial reuse.",
     "notes": "Colligo geometry is EPSG:2896 and is transformed to WGS84; int_findTabData enriches parcel attributes by ogr_fid.",
     "fieldMap": {
@@ -611,9 +611,9 @@
     "sourceUpdatedAt": null,
     "inputFile": "data/parcels/delta-mi-fetchgis.geojson",
     "refreshCadence": "monthly metadata check; quarterly full refresh",
-    "lastRefreshReviewedAt": null,
+    "lastRefreshReviewedAt": "2026-09-07",
     "refreshNotes": "Private personal MVP import from county-linked CUPPAD FetchGIS public parcel layer. Verify county, CUPPAD, or FetchGIS terms before any commercial reuse.",
-    "notes": "FetchGIS proxy returns ArcGIS JSON in Web Mercator. Public map layer exposes parcel id and geometry.",
+    "notes": "FetchGIS proxy returns ArcGIS JSON in Web Mercator. Public map layer exposes parcel id and geometry. September 2026 layer now exposes Parcel_PIN; OBJECTID/GlobalID were regenerated and must not be used alone to preserve existing parcel UUIDs.",
     "fieldMap": {
       "sourceFeatureId": [
         "GlobalID",
@@ -621,9 +621,11 @@
         "Parcel_PIN"
       ],
       "parcelId": [
+        "Parcel_PIN",
         "Parcel_PIN"
       ],
       "apn": [
+        "Parcel_PIN",
         "Parcel_PIN"
       ],
       "ownerName": [],
@@ -651,7 +653,7 @@
     "sourceUpdatedAt": null,
     "inputFile": "data/parcels/gladstone-mi-colligo.geojson",
     "refreshCadence": "monthly metadata check; quarterly full refresh",
-    "lastRefreshReviewedAt": "2026-08-02",
+    "lastRefreshReviewedAt": "2026-09-07",
     "refreshNotes": "Supplemental city layer used to fill the Gladstone gap in the Delta County/CUPPAD FetchGIS source. The City links public parcel mapping, Colligo lists the layer as a public site, and the current layer exposes 2026 assessment fields. Keep use private/internal unless the City or Colligo confirms broader commercial reuse rights.",
     "notes": "City assessor page: https://www.gladstonemi.gov/assessor. Public parcel layer: https://colligogis.com/public/. Colligo geometry is EPSG:3590 and is transformed to WGS84; int_findTabData enriches parcel attributes by ogr_fid.",
     "fieldMap": {
@@ -716,7 +718,7 @@
     "sourceUpdatedAt": null,
     "inputFile": "data/parcels/escanaba-mi-public-mapguide.geojson",
     "refreshCadence": "monthly metadata check; quarterly full refresh",
-    "lastRefreshReviewedAt": null,
+    "lastRefreshReviewedAt": "2026-09-07",
     "refreshNotes": "Supplemental public city GIS layer used to fill Escanaba city-center parcel coverage gaps in the Delta County/CUPPAD FetchGIS layer. The public source page lists guest access credentials; keep them in local env rather than committing them.",
     "notes": "City GIS page: https://www.escanaba.org/engineering/page/escanaba-city-geographic-information-system-gis. Public disclaimer says the information is unofficial and not guaranteed/certified. Geometry is MapGuide WKT in Michigan state-plane feet and is transformed to WGS84.",
     "fieldMap": {
@@ -770,7 +772,7 @@
     "sourceUpdatedAt": null,
     "inputFile": "data/parcels/menominee-mi-colligo.geojson",
     "refreshCadence": "monthly metadata check; quarterly full refresh",
-    "lastRefreshReviewedAt": null,
+    "lastRefreshReviewedAt": "2026-09-07",
     "refreshNotes": "Private personal MVP import from county-linked Colligo public GIS. Verify county or Colligo terms before any commercial reuse.",
     "notes": "Colligo geometry is EPSG:2896 and is transformed to WGS84; int_findTabData enriches parcel attributes by ogr_fid.",
     "fieldMap": {
