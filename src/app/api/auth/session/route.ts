@@ -31,6 +31,7 @@ async function getSession(request: Request) {
     ok: true,
     data: {
       authEnabled: isPrivateAuthEnabled(),
+      vectorTilesAvailable: hasDatabaseConfig(),
       accountCreationEnabled: isPrivateAuthEnabled() && hasDatabaseConfig(),
       authenticated: Boolean(user),
       user: user ? toPublicUser(user) : null
@@ -99,6 +100,7 @@ async function createSession(request: Request) {
     ok: true,
     data: {
       authEnabled: true,
+      vectorTilesAvailable: hasDatabaseConfig(),
       accountCreationEnabled: hasDatabaseConfig(),
       authenticated: true,
       user: toPublicUser(user)
@@ -113,6 +115,7 @@ async function deleteSession() {
     ok: true,
     data: {
       authEnabled: isPrivateAuthEnabled(),
+      vectorTilesAvailable: hasDatabaseConfig(),
       accountCreationEnabled: isPrivateAuthEnabled() && hasDatabaseConfig(),
       authenticated: false,
       user: null

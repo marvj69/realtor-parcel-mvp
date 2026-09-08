@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import maplibregl from "maplibre-gl";
+import type * as MapLibre from "maplibre-gl";
+import type MapLibreDefault from "maplibre-gl";
+
+let maplibregl: typeof MapLibreDefault;
 import {
   area as turfArea,
   bbox as turfBbox,
@@ -100,7 +103,7 @@ type MeasurementFeatureProperties = {
 };
 
 type BasemapMode = "streets" | "satellite";
-type MapStyleConfig = string | maplibregl.StyleSpecification;
+type MapStyleConfig = string | MapLibre.StyleSpecification;
 type LayerVisibility = "visible" | "none";
 type LayerVisibilityById = Record<string, LayerVisibility>;
 type NumberInterpolateExpression = ["interpolate", ["linear"], ["zoom"], number, number, number, number];
@@ -115,7 +118,7 @@ function configureMapPerformance() {
   maplibregl.setWorkerCount(Math.min(Math.max(2, Math.floor(availableCores / 2)), MAPLIBRE_WORKER_LIMIT));
 }
 
-function setParcelBoundaryPaint(map: maplibregl.Map, basemapMode: BasemapMode, minZoom: number) {
+function setParcelBoundaryPaint(map: MapLibre.Map, basemapMode: BasemapMode, minZoom: number) {
   const isSatellite = basemapMode === "satellite";
   const parcelLineColor = isSatellite ? SATELLITE_PARCEL_LINE_COLOR : STREET_PARCEL_LINE_COLOR;
   const selectedLineColor = isSatellite ? SATELLITE_SELECTED_PARCEL_LINE_COLOR : STREET_SELECTED_PARCEL_LINE_COLOR;
@@ -139,17 +142,17 @@ function setParcelBoundaryPaint(map: maplibregl.Map, basemapMode: BasemapMode, m
   }
 }
 
-function getStyleLayerVisibility(layer: maplibregl.LayerSpecification): LayerVisibility {
+function getStyleLayerVisibility(layer: MapLibre.LayerSpecification): LayerVisibility {
   return layer.layout?.visibility === "none" ? "none" : "visible";
 }
 
-function captureStreetBasemapLayerVisibility(map: maplibregl.Map): LayerVisibilityById {
+function captureStreetBasemapLayerVisibility(map: MapLibre.Map): LayerVisibilityById {
   const layers = map.getStyle().layers ?? [];
   return Object.fromEntries(layers.map((layer) => [layer.id, getStyleLayerVisibility(layer)]));
 }
 
 function setStreetBasemapVisibility(
-  map: maplibregl.Map,
+  map: MapLibre.Map,
   basemapMode: BasemapMode,
   streetLayerVisibility: LayerVisibilityById
 ) {
@@ -160,7 +163,7 @@ function setStreetBasemapVisibility(
   }
 }
 
-function setSatelliteBasemapVisibility(map: maplibregl.Map, basemapMode: BasemapMode) {
+function setSatelliteBasemapVisibility(map: MapLibre.Map, basemapMode: BasemapMode) {
   for (const layerId of SATELLITE_LAYER_IDS) {
     if (map.getLayer(layerId)) {
       map.setLayoutProperty(layerId, "visibility", basemapMode === "satellite" ? "visible" : "none");
@@ -169,7 +172,7 @@ function setSatelliteBasemapVisibility(map: maplibregl.Map, basemapMode: Basemap
 }
 
 function applyBasemapMode(
-  map: maplibregl.Map,
+  map: MapLibre.Map,
   basemapMode: BasemapMode,
   streetLayerVisibility: LayerVisibilityById,
   parcelMinZoom: number
@@ -274,15 +277,15 @@ function getParcelLayerConfig() {
 }
 
 function setGeoJsonSourceData(
-  map: maplibregl.Map,
+  map: MapLibre.Map,
   sourceId: string,
   data: FeatureCollection<Polygon | MultiPolygon, ParcelProperties>
 ) {
-  const source = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
+  const source = map.getSource(sourceId) as MapLibre.GeoJSONSource | undefined;
   if (source) source.setData(data);
 }
 
-function getSelectableParcelAtPoint(map: maplibregl.Map, point: maplibregl.PointLike) {
+function getSelectableParcelAtPoint(map: MapLibre.Map, point: MapLibre.PointLike) {
   const offlineLayerIds = [OFFLINE_PARCEL_FILL_LAYER_ID].filter((layerId) => Boolean(map.getLayer(layerId)));
   const offlineFeatures =
     offlineLayerIds.length > 0 ? map.queryRenderedFeatures(point, { layers: offlineLayerIds }) : [];
@@ -309,14 +312,14 @@ function getSelectableParcelAtPoint(map: maplibregl.Map, point: maplibregl.Point
 }
 
 function setMeasurementSourceData(
-  map: maplibregl.Map,
+  map: MapLibre.Map,
   data: FeatureCollection<Geometry, MeasurementFeatureProperties>
 ) {
-  const source = map.getSource(MEASUREMENT_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
+  const source = map.getSource(MEASUREMENT_SOURCE_ID) as MapLibre.GeoJSONSource | undefined;
   if (source) source.setData(data);
 }
 
-function getSelectedParcelCameraPadding(map: maplibregl.Map): maplibregl.PaddingOptions {
+function getSelectedParcelCameraPadding(map: MapLibre.Map): MapLibre.PaddingOptions {
   const container = map.getContainer();
   if (window.innerWidth > 760) return { top: 100, right: 80, bottom: 80, left: 60 };
   const containerHeight = container.clientHeight;
@@ -350,7 +353,7 @@ function getSelectedParcelCameraPadding(map: maplibregl.Map): maplibregl.Padding
   };
 }
 
-function focusMapOnSelectedParcel(map: maplibregl.Map, parcel: ParcelFeature) {
+function focusMapOnSelectedParcel(map: MapLibre.Map, parcel: ParcelFeature) {
   const [west, south, east, north] = turfBbox(parcel);
   if (![west, south, east, north].every(Number.isFinite)) return;
 
@@ -377,11 +380,11 @@ function focusMapOnSelectedParcel(map: maplibregl.Map, parcel: ParcelFeature) {
   });
 }
 
-function getBoundsBbox(bounds: maplibregl.LngLatBounds): OfflineAreaBbox {
+function getBoundsBbox(bounds: MapLibre.LngLatBounds): OfflineAreaBbox {
   return [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()];
 }
 
-function fitMapToBbox(map: maplibregl.Map, bbox: OfflineAreaBbox) {
+function fitMapToBbox(map: MapLibre.Map, bbox: OfflineAreaBbox) {
   const [west, south, east, north] = bbox;
   map.fitBounds(new maplibregl.LngLatBounds([west, south], [east, north]), {
     padding: getSelectedParcelCameraPadding(map),
@@ -583,6 +586,7 @@ type AuthPayload = {
   ok?: boolean;
   data?: {
     authEnabled: boolean;
+    vectorTilesAvailable?: boolean;
     accountCreationEnabled: boolean;
     authenticated: boolean;
     user: {
@@ -598,12 +602,13 @@ type AuthMode = "sign-in" | "create-account";
 
 export default function ParcelMap() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
+  const mapRef = useRef<MapLibre.Map | null>(null);
   const parcelAbortRef = useRef<AbortController | null>(null);
   const parcelDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const parcelIdleLoadRef = useRef<(() => void) | null>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
   const selectionRequestRef = useRef(0);
+  const lookupAbortRef = useRef<AbortController | null>(null);
   const basemapModeRef = useRef<BasemapMode>("streets");
   const activePanelRef = useRef<AppPanel>("search");
   const measurementModeRef = useRef<MeasurementMode>("distance");
@@ -615,8 +620,6 @@ export default function ParcelMap() {
   const [basemapMode, setBasemapMode] = useState<BasemapMode>("streets");
   const [measurementMode, setMeasurementMode] = useState<MeasurementMode>("distance");
   const [measurementPoints, setMeasurementPoints] = useState<MeasurementPoint[]>([]);
-  const [, setVisibleCount] = useState(0);
-  const [, setTotalInView] = useState(0);
   const [statusMessage, setStatusMessage] = useState("Zoom in to view parcels.");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -625,6 +628,7 @@ export default function ParcelMap() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [mapLibraryReady, setMapLibraryReady] = useState(false);
   const [authData, setAuthData] = useState<AuthPayload["data"] | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [authUsername, setAuthUsername] = useState("");
@@ -690,7 +694,7 @@ export default function ParcelMap() {
     return () => clearTimeout(timeout);
   }, [toast]);
 
-  function applyOverlayPreferences(map: maplibregl.Map) {
+  function applyOverlayPreferences(map: MapLibre.Map) {
     const prefs = overlayPreferencesRef.current;
     for (const id of [PARCEL_TILE_LINE_LAYER_ID, PARCEL_GEOJSON_LINE_LAYER_ID, OFFLINE_PARCEL_LINE_LAYER_ID]) {
       if (map.getLayer(id)) map.setPaintProperty(id, "line-opacity", prefs.boundaries ? 0.85 : 0);
@@ -715,6 +719,7 @@ export default function ParcelMap() {
 
   function selectRecentParcel(parcel: ParcelFeature) {
     selectionRequestRef.current += 1;
+    lookupAbortRef.current?.abort();
     setSelectedParcelState(parcel);
     setActivePanel("details");
     const map = mapRef.current;
@@ -967,13 +972,13 @@ export default function ParcelMap() {
   }, []);
 
   useEffect(() => {
-    if (authLoading || !authData?.authenticated) return;
+    if (authLoading || !authData?.authenticated || activePanel !== "offline") return;
     const timeout = window.setTimeout(() => {
       void refreshOfflineAreas();
     }, 0);
 
     return () => window.clearTimeout(timeout);
-  }, [authData?.authenticated, authLoading]);
+  }, [authData?.authenticated, authLoading, activePanel]);
 
   useEffect(() => {
     basemapModeRef.current = basemapMode;
@@ -1025,6 +1030,19 @@ export default function ParcelMap() {
 
   useEffect(() => {
     if (authLoading || !authData?.authenticated) return;
+    let cancelled = false;
+    void import("maplibre-gl").then(module => {
+      if (cancelled) return;
+      maplibregl = module.default;
+      setMapLibraryReady(true);
+    }).catch(() => {
+      if (!cancelled) setError("Unable to load the map. Please reload and try again.");
+    });
+    return () => { cancelled = true; };
+  }, [authData?.authenticated, authLoading]);
+
+  useEffect(() => {
+    if (authLoading || !authData?.authenticated || !mapLibraryReady) return;
     if (!mapContainerRef.current || mapRef.current) return;
 
     const config = getMapConfig();
@@ -1052,12 +1070,13 @@ export default function ParcelMap() {
     const resizeObserver = new ResizeObserver(() => map.resize());
     resizeObserver.observe(mapContainerRef.current);
     mapRef.current = map;
-    const parcelLayerConfig = getParcelLayerConfig();
+    const parcelLayerConfig = {
+      ...getParcelLayerConfig(),
+      vectorTilesEnabled: getParcelLayerConfig().vectorTilesEnabled && authData.vectorTilesAvailable !== false
+    };
 
     function clearParcels(message: string) {
       setGeoJsonSourceData(map, "parcels", EMPTY_FEATURE_COLLECTION);
-      setVisibleCount(0);
-      setTotalInView(0);
       setStatusMessage(message);
     }
 
@@ -1108,8 +1127,6 @@ export default function ParcelMap() {
         const shouldShowGeoJsonParcels = !parcelLayerConfig.vectorTilesEnabled || Boolean(payload.demo);
         setParcelGeoJsonLayerVisibility(shouldShowGeoJsonParcels);
         setGeoJsonSourceData(mapRef.current, "parcels", shouldShowGeoJsonParcels ? data : EMPTY_FEATURE_COLLECTION);
-        setVisibleCount(shouldShowGeoJsonParcels ? data.features.length : payload.count ?? 0);
-        setTotalInView(payload.count ?? data.features.length);
         setStatusMessage(
           payload.message ??
             (parcelLayerConfig.vectorTilesEnabled
@@ -1140,6 +1157,13 @@ export default function ParcelMap() {
 
     function queueVisibleParcelLoad(delay = 220) {
       cancelQueuedVisibleParcelLoad();
+      if (parcelLayerConfig.vectorTilesEnabled) {
+        if (!map.getSource(PARCEL_TILE_SOURCE_ID)) return;
+        const showParcels = map.getZoom() >= parcelLayerConfig.minZoom;
+        setLoading(showParcels && !map.isSourceLoaded(PARCEL_TILE_SOURCE_ID));
+        setStatusMessage(showParcels ? "Click a parcel for full details." : "Zoom in to view parcels.");
+        return;
+      }
       parcelDebounceRef.current = setTimeout(() => {
         parcelDebounceRef.current = null;
 
@@ -1176,9 +1200,12 @@ export default function ParcelMap() {
 
     async function selectParcelAt(lng: number, lat: number) {
       const requestId = ++selectionRequestRef.current;
+      lookupAbortRef.current?.abort();
+      const controller = new AbortController();
+      lookupAbortRef.current = controller;
       setError(null);
       try {
-        const response = await fetch(`/api/parcels/lookup?lng=${lng}&lat=${lat}`);
+        const response = await fetch(`/api/parcels/lookup?lng=${lng}&lat=${lat}`, { signal: controller.signal });
         const payload = (await response.json()) as { ok?: boolean; data?: ParcelFeature | null; error?: string };
 
         if (!response.ok || !payload.ok) {
@@ -1211,7 +1238,7 @@ export default function ParcelMap() {
         attribution: config.satelliteAttribution
       });
 
-      const satelliteLayer: maplibregl.RasterLayerSpecification = {
+      const satelliteLayer: MapLibre.RasterLayerSpecification = {
         id: SATELLITE_LAYER_ID,
         type: "raster",
         source: SATELLITE_SOURCE_ID,
@@ -1324,7 +1351,7 @@ export default function ParcelMap() {
             `${window.location.origin}/api/parcels/tiles/{z}/{x}/{y}?v=${process.env.NEXT_PUBLIC_PARCEL_DATASET_VERSION}`
           ],
           minzoom: parcelLayerConfig.minZoom,
-          maxzoom: 22
+          maxzoom: 18
         });
 
         map.addLayer({
@@ -1477,6 +1504,19 @@ export default function ParcelMap() {
       queueVisibleParcelLoad(0);
     });
 
+    map.on("sourcedata", event => {
+      if (event.sourceId === PARCEL_TILE_SOURCE_ID && event.isSourceLoaded) setLoading(false);
+    });
+    map.on("sourcedataloading", event => {
+      if (event.sourceId === PARCEL_TILE_SOURCE_ID) setLoading(true);
+    });
+    map.on("error", event => {
+      if ("sourceId" in event && event.sourceId === PARCEL_TILE_SOURCE_ID) {
+        setLoading(false);
+        setError("Unable to load parcel boundaries. Check your connection or sign in again.");
+      }
+    });
+
     map.on("moveend", () => {
       const center = map.getCenter();
       setCoordinate(
@@ -1505,6 +1545,7 @@ export default function ParcelMap() {
       }
 
       selectionRequestRef.current += 1;
+      lookupAbortRef.current?.abort();
       if (clickedParcel.parcelId && clickedParcel.parcelId === selectedParcelRef.current?.properties.id) {
         setSelectedParcelFeature(null);
         setStatusMessage("Parcel unselected.");
@@ -1528,11 +1569,12 @@ export default function ParcelMap() {
       cancelQueuedVisibleParcelLoad();
       resizeObserver.disconnect();
       searchAbortRef.current?.abort();
+      lookupAbortRef.current?.abort();
       map.remove();
       mapRef.current = null;
       streetLayerVisibilityRef.current = {};
     };
-  }, [authData?.authenticated, authLoading]);
+  }, [authData?.authenticated, authData?.vectorTilesAvailable, authLoading, mapLibraryReady]);
 
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1630,12 +1672,15 @@ export default function ParcelMap() {
   async function selectSearchResult(result: ParcelSearchResult) {
     if (!result.center) return;
     const requestId = ++selectionRequestRef.current;
+    lookupAbortRef.current?.abort();
+    const controller = new AbortController();
+    lookupAbortRef.current = controller;
     setError(null);
     const [lng, lat] = result.center.coordinates;
     const map = mapRef.current;
 
     try {
-      const response = await fetch(`/api/parcels/lookup?lng=${lng}&lat=${lat}`);
+      const response = await fetch(`/api/parcels/lookup?lng=${lng}&lat=${lat}`, { signal: controller.signal });
       const payload = (await response.json()) as { ok?: boolean; data?: ParcelFeature | null; error?: string };
       if (!response.ok || !payload.ok) throw new Error(payload.error ?? "Unable to load selected parcel");
 
@@ -1643,7 +1688,7 @@ export default function ParcelMap() {
       const nextParcel = payload.data ?? null;
       setSelectedParcelState(nextParcel);
       if (nextParcel) setActivePanel("details");
-      const selectedSource = map?.getSource("selected-parcel") as maplibregl.GeoJSONSource | undefined;
+      const selectedSource = map?.getSource("selected-parcel") as MapLibre.GeoJSONSource | undefined;
       selectedSource?.setData(
         nextParcel
           ? {

@@ -1,6 +1,7 @@
 import type { ParcelFeature } from "@/types/parcel";
+import { memo } from "react";
 
-export default function ParcelOutline({ parcel }: { parcel: ParcelFeature }) {
+export default memo(function ParcelOutline({ parcel }: { parcel: ParcelFeature }) {
   const polygons = parcel.geometry.type === "Polygon" ? [parcel.geometry.coordinates] : parcel.geometry.coordinates;
   const points = polygons.flat(2);
   let west = Infinity,
@@ -44,4 +45,4 @@ export default function ParcelOutline({ parcel }: { parcel: ParcelFeature }) {
       </text>
     </svg>
   );
-}
+});
