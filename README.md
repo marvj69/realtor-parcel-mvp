@@ -14,18 +14,25 @@ workspace. Bulk imports into the small production user-data backend are blocked.
 
 This starter is designed for GitHub + Vercel + Neon and gives a coding agent enough structure to begin building immediately.
 
-## What this MVP does
+## Parcel workspace
 
-- Displays an interactive MapLibre map.
-- Uses a no-key USGS Topo raster basemap by default.
-- Adds a satellite/aerial imagery toggle using a configurable public raster tile source.
-- Looks up parcels from a Neon/PostGIS database by map click.
-- Loads visible parcel outlines by map bounding box.
-- Shows a parcel details drawer.
-- Saves parcels to a lightweight project table.
-- Saves selected map areas to browser storage for offline parcel review.
-- Includes import scripts for public GIS parcel GeoJSON / ArcGIS FeatureServer data.
-- Includes agent instructions, data-source playbook, schema, todo list, and deployment notes.
+- Responsive map workspace with desktop navigation and an expandable mobile panel.
+- Topographic and satellite basemaps, parcel/label controls, fill opacity, compass,
+  location control, scale, fullscreen, and copyable map-view links.
+- Ranked address/APN/owner search with county, source land-use, and acreage filters
+  **on the returned results**, plus sorting and CSV export (up to 50 matches).
+- Parcel overview with a preview of the actual boundary geometry, a source record,
+  verified-source link, and a printable property brief preview.
+- Compare up to three parcels and export their public records as CSV.
+- Save parcels and workflow tags to projects; search loaded projects/properties/
+  notes and filter by tag. Notes and saves continue to use the existing Neon APIs.
+- Recent selections, comparisons, and unsaved note drafts stay in memory for the
+  current page session. Save a note to a project for durable storage.
+- Distance/area/box measurements and browser-saved offline parcel areas.
+- Persistent approximate-boundary disclaimer; missing data remains unavailable,
+  and assessed values are labeled separately from market value.
+
+See [Workspace features and verification](docs/UI_WORKSPACE.md) for limits and checks.
 
 ## Stack
 

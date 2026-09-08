@@ -2,8 +2,15 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import maplibregl from "maplibre-gl";
-import { area as turfArea, bbox as turfBbox, length as turfLength, lineString as turfLineString, polygon as turfPolygon } from "@turf/turf";
+import {
+  area as turfArea,
+  bbox as turfBbox,
+  length as turfLength,
+  lineString as turfLineString,
+  polygon as turfPolygon
+} from "@turf/turf";
 import type { Feature, FeatureCollection, Geometry, MultiPolygon, Polygon, Position } from "geojson";
+import WorkspaceChrome from "@/components/WorkspaceChrome";
 import ParcelDetails from "@/components/ParcelDetails";
 import {
   deleteOfflineArea,
@@ -98,26 +105,6 @@ type LayerVisibility = "visible" | "none";
 type LayerVisibilityById = Record<string, LayerVisibility>;
 type NumberInterpolateExpression = ["interpolate", ["linear"], ["zoom"], number, number, number, number];
 type SelectableParcelSource = "live" | "offline";
-
-function GlobeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M3.5 12h17" />
-      <path d="M12 3.5c2.2 2.3 3.4 5.1 3.4 8.5s-1.2 6.2-3.4 8.5" />
-      <path d="M12 3.5C9.8 5.8 8.6 8.6 8.6 12s1.2 6.2 3.4 8.5" />
-    </svg>
-  );
-}
-
-function TreeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M12 3.5 5.8 12h3.1l-4 5.3h14.2l-4-5.3h3.1L12 3.5Z" />
-      <path d="M12 17.3v3.2" />
-    </svg>
-  );
-}
 
 function getStreetParcelTileLineOpacity(minZoom: number): NumberInterpolateExpression {
   return ["interpolate", ["linear"], ["zoom"], minZoom, 0.45, 16, 0.8];
@@ -221,9 +208,7 @@ function getStreetMapStyle(styleUrl: string | undefined): MapStyleConfig {
 }
 
 function getDefaultSatelliteMaxZoom(tileUrl: string) {
-  return tileUrl.includes("/USGSImageryOnly/MapServer/tile/")
-    ? 16
-    : DEFAULT_SATELLITE_MAX_ZOOM;
+  return tileUrl.includes("/USGSImageryOnly/MapServer/tile/") ? 16 : DEFAULT_SATELLITE_MAX_ZOOM;
 }
 
 function getMapConfig() {
@@ -251,7 +236,9 @@ function getMapConfig() {
   return {
     style: getStreetMapStyle(process.env.NEXT_PUBLIC_MAP_STYLE_URL),
     satelliteTileUrl,
-    satelliteMaxZoom: Number.isFinite(satelliteMaxZoom) ? satelliteMaxZoom : getDefaultSatelliteMaxZoom(satelliteTileUrl),
+    satelliteMaxZoom: Number.isFinite(satelliteMaxZoom)
+      ? satelliteMaxZoom
+      : getDefaultSatelliteMaxZoom(satelliteTileUrl),
     satelliteDetailTileUrl:
       satelliteDetailTileUrlEnv === "" ? null : satelliteDetailTileUrlEnv ?? DEFAULT_SATELLITE_DETAIL_TILE_URL,
     satelliteDetailMinZoom: Number.isFinite(satelliteDetailMinZoom)
@@ -297,7 +284,8 @@ function setGeoJsonSourceData(
 
 function getSelectableParcelAtPoint(map: maplibregl.Map, point: maplibregl.PointLike) {
   const offlineLayerIds = [OFFLINE_PARCEL_FILL_LAYER_ID].filter((layerId) => Boolean(map.getLayer(layerId)));
-  const offlineFeatures = offlineLayerIds.length > 0 ? map.queryRenderedFeatures(point, { layers: offlineLayerIds }) : [];
+  const offlineFeatures =
+    offlineLayerIds.length > 0 ? map.queryRenderedFeatures(point, { layers: offlineLayerIds }) : [];
   const offlineParcelId =
     offlineFeatures.find((feature) => typeof feature.properties?.id === "string")?.properties?.id ?? null;
 
@@ -313,7 +301,11 @@ function getSelectableParcelAtPoint(map: maplibregl.Map, point: maplibregl.Point
 
   const features = map.queryRenderedFeatures(point, { layers: parcelLayerIds });
   const parcelId = features.find((feature) => typeof feature.properties?.id === "string")?.properties?.id ?? null;
-  return { hasFeature: features.length > 0, parcelId, source: features.length > 0 ? ("live" as SelectableParcelSource) : null };
+  return {
+    hasFeature: features.length > 0,
+    parcelId,
+    source: features.length > 0 ? ("live" as SelectableParcelSource) : null
+  };
 }
 
 function setMeasurementSourceData(
@@ -326,10 +318,14 @@ function setMeasurementSourceData(
 
 function getSelectedParcelCameraPadding(map: maplibregl.Map): maplibregl.PaddingOptions {
   const container = map.getContainer();
+  if (window.innerWidth > 760) return { top: 100, right: 80, bottom: 80, left: 60 };
   const containerHeight = container.clientHeight;
   const containerWidth = container.clientWidth;
   const sidePadding = containerWidth < 720 ? 18 : SELECTED_PARCEL_SIDE_PADDING;
-  const fallbackPanelHeight = Math.min(containerHeight * (containerWidth < 720 ? 0.54 : 0.5), containerWidth < 720 ? 500 : 520);
+  const fallbackPanelHeight = Math.min(
+    containerHeight * (containerWidth < 720 ? 0.54 : 0.5),
+    containerWidth < 720 ? 500 : 520
+  );
   let coveredPanelHeight = fallbackPanelHeight;
 
   const panel = document.querySelector<HTMLElement>(".side-panel:not(.collapsed)");
@@ -387,20 +383,12 @@ function getBoundsBbox(bounds: maplibregl.LngLatBounds): OfflineAreaBbox {
 
 function fitMapToBbox(map: maplibregl.Map, bbox: OfflineAreaBbox) {
   const [west, south, east, north] = bbox;
-  map.fitBounds(
-    new maplibregl.LngLatBounds([west, south], [east, north]),
-    {
-      padding: {
-        top: 72,
-        right: 24,
-        bottom: 220,
-        left: 24
-      },
-      maxZoom: 17,
-      duration: 700,
-      essential: true
-    }
-  );
+  map.fitBounds(new maplibregl.LngLatBounds([west, south], [east, north]), {
+    padding: getSelectedParcelCameraPadding(map),
+    maxZoom: 17,
+    duration: 700,
+    essential: true
+  });
 }
 
 function getMeasurementDownloadBbox(mode: MeasurementMode, points: MeasurementPoint[]): OfflineAreaBbox | null {
@@ -521,7 +509,9 @@ function formatArea(squareMeters: number) {
   if (!Number.isFinite(squareMeters) || squareMeters <= 0) return "0 sq ft";
   const squareFeet = squareMeters * 10.7639;
   const acres = squareMeters * 0.000247105;
-  return `${acres.toLocaleString(undefined, { maximumFractionDigits: 2 })} ac (${Math.round(squareFeet).toLocaleString()} sq ft)`;
+  return `${acres.toLocaleString(undefined, { maximumFractionDigits: 2 })} ac (${Math.round(
+    squareFeet
+  ).toLocaleString()} sq ft)`;
 }
 
 function getLineDistance(points: MeasurementPoint[]) {
@@ -613,19 +603,20 @@ export default function ParcelMap() {
   const parcelDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const parcelIdleLoadRef = useRef<(() => void) | null>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
+  const selectionRequestRef = useRef(0);
   const basemapModeRef = useRef<BasemapMode>("streets");
-  const activePanelRef = useRef<AppPanel>("map");
+  const activePanelRef = useRef<AppPanel>("search");
   const measurementModeRef = useRef<MeasurementMode>("distance");
   const selectedParcelRef = useRef<ParcelFeature | null>(null);
   const offlineFeatureCollectionRef = useRef<ParcelFeatureCollection | null>(null);
   const streetLayerVisibilityRef = useRef<LayerVisibilityById>({});
   const [selectedParcel, setSelectedParcel] = useState<ParcelFeature | null>(null);
-  const [activePanel, setActivePanel] = useState<AppPanel>("map");
+  const [activePanel, setActivePanel] = useState<AppPanel>("search");
   const [basemapMode, setBasemapMode] = useState<BasemapMode>("streets");
   const [measurementMode, setMeasurementMode] = useState<MeasurementMode>("distance");
   const [measurementPoints, setMeasurementPoints] = useState<MeasurementPoint[]>([]);
-  const [visibleCount, setVisibleCount] = useState(0);
-  const [totalInView, setTotalInView] = useState(0);
+  const [, setVisibleCount] = useState(0);
+  const [, setTotalInView] = useState(0);
   const [statusMessage, setStatusMessage] = useState("Zoom in to view parcels.");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -650,9 +641,149 @@ export default function ParcelMap() {
   const [offlineError, setOfflineError] = useState<string | null>(null);
   const [activeOfflineAreaId, setActiveOfflineAreaId] = useState<string | null>(null);
 
+  const [recentParcels, setRecentParcels] = useState<ParcelFeature[]>([]);
+  const [compareParcels, setCompareParcels] = useState<ParcelFeature[]>([]);
+  const [boundaries, setBoundaries] = useState(true);
+  const [labels, setLabels] = useState(true);
+  const [fillOpacity, setFillOpacity] = useState(8);
+  const overlayPreferencesRef = useRef({ boundaries: true, labels: true, fillOpacity: 8 });
+  const [online, setOnline] = useState(true);
+  const [coordinate, setCoordinate] = useState("47.12110° N · 88.56900° W");
+  const [toast, setToast] = useState("");
+
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    const keyboard = (event: KeyboardEvent) => {
+      if (
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement ||
+        event.target instanceof HTMLSelectElement ||
+        (event.target instanceof HTMLElement && event.target.isContentEditable)
+      )
+        return;
+      if (event.key === "/") {
+        event.preventDefault();
+        setActivePanel("search");
+        setTimeout(() => document.getElementById("parcel-search")?.focus(), 40);
+      }
+      if (event.key.toLowerCase() === "m") setActivePanel("measure");
+      if (event.key.toLowerCase() === "s") setActivePanel("saved");
+      if (event.key === "Escape") setActivePanel("map");
+    };
+    window.addEventListener("keydown", keyboard);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+      window.removeEventListener("keydown", keyboard);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timeout = setTimeout(() => setToast(""), 4500);
+    return () => clearTimeout(timeout);
+  }, [toast]);
+
+  function applyOverlayPreferences(map: maplibregl.Map) {
+    const prefs = overlayPreferencesRef.current;
+    for (const id of [PARCEL_TILE_LINE_LAYER_ID, PARCEL_GEOJSON_LINE_LAYER_ID, OFFLINE_PARCEL_LINE_LAYER_ID]) {
+      if (map.getLayer(id)) map.setPaintProperty(id, "line-opacity", prefs.boundaries ? 0.85 : 0);
+    }
+    for (const id of [PARCEL_TILE_FILL_LAYER_ID, PARCEL_GEOJSON_FILL_LAYER_ID, OFFLINE_PARCEL_FILL_LAYER_ID]) {
+      if (map.getLayer(id)) map.setPaintProperty(id, "fill-opacity", prefs.boundaries ? prefs.fillOpacity / 100 : 0);
+    }
+    for (const id of [SATELLITE_ROAD_LABEL_LAYER_ID, SATELLITE_PLACE_LABEL_LAYER_ID]) {
+      if (map.getLayer(id))
+        map.setLayoutProperty(
+          id,
+          "visibility",
+          prefs.labels && basemapModeRef.current === "satellite" ? "visible" : "none"
+        );
+    }
+  }
+
+  useEffect(() => {
+    overlayPreferencesRef.current = { boundaries, labels, fillOpacity };
+    if (mapRef.current) applyOverlayPreferences(mapRef.current);
+  }, [boundaries, labels, fillOpacity]);
+
+  function selectRecentParcel(parcel: ParcelFeature) {
+    selectionRequestRef.current += 1;
+    setSelectedParcelState(parcel);
+    setActivePanel("details");
+    const map = mapRef.current;
+    if (map) {
+      setGeoJsonSourceData(map, "selected-parcel", { type: "FeatureCollection", features: [parcel] });
+      focusMapOnSelectedParcel(map, parcel);
+    }
+  }
+
+  function toggleComparison(parcel: ParcelFeature) {
+    if (compareParcels.some((p) => p.properties.id === parcel.properties.id)) {
+      setCompareParcels((items) => items.filter((p) => p.properties.id !== parcel.properties.id));
+      return;
+    }
+    if (compareParcels.length >= 3) {
+      setToast("Your comparison has 3 parcels. Remove one to add another.");
+      return;
+    }
+    setCompareParcels((items) => [...items, parcel]);
+    setToast("Property added to Compare.");
+  }
+
+  function changeSearchQuery(query: string) {
+    searchAbortRef.current?.abort();
+    setSearchLoading(false);
+    setSearchQuery(query);
+    setSearchResults([]);
+    setSearchError(null);
+  }
+
+  async function copyMapLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setToast("Map link copied. Recipients need their own workspace access.");
+    } catch {
+      setToast("Copy unavailable. Copy the map URL from your address bar.");
+    }
+  }
+
+  async function signOut() {
+    try {
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+      if (!response.ok) throw new Error("Sign out failed. Please try again.");
+      window.location.reload();
+    } catch (err) {
+      setToast(err instanceof Error ? err.message : "Unable to sign out.");
+    }
+  }
+
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch {
+      setToast("Fullscreen is not available in this browser.");
+    }
+  }
+
+  function goToMarket(center: [number, number]) {
+    mapRef.current?.flyTo({ center, zoom: 14, pitch: 0, bearing: 0, duration: 1100 });
+  }
+
   function setSelectedParcelState(nextParcel: ParcelFeature | null) {
     selectedParcelRef.current = nextParcel;
     setSelectedParcel(nextParcel);
+    if (nextParcel)
+      setRecentParcels((items) =>
+        [nextParcel, ...items.filter((p) => p.properties.id !== nextParcel.properties.id)].slice(0, 8)
+      );
   }
 
   async function refreshOfflineAreas() {
@@ -674,7 +805,11 @@ export default function ParcelMap() {
     const map = mapRef.current;
     offlineFeatureCollectionRef.current = area.featureCollection;
     setActiveOfflineAreaId(area.id);
-    setOfflineStatus(`${area.parcelCount.toLocaleString()} downloaded parcel${area.parcelCount === 1 ? "" : "s"} loaded from this browser.`);
+    setOfflineStatus(
+      `${area.parcelCount.toLocaleString()} downloaded parcel${
+        area.parcelCount === 1 ? "" : "s"
+      } loaded from this browser.`
+    );
     setOfflineError(null);
 
     if (map) {
@@ -725,7 +860,10 @@ export default function ParcelMap() {
     const map = mapRef.current;
     if (!map) return;
 
-    const bbox = source === "current-view" ? getBoundsBbox(map.getBounds()) : getMeasurementDownloadBbox(measurementMode, measurementPoints);
+    const bbox =
+      source === "current-view"
+        ? getBoundsBbox(map.getBounds())
+        : getMeasurementDownloadBbox(measurementMode, measurementPoints);
     if (!bbox) {
       setOfflineError("Measure an area box before downloading a measured area.");
       return;
@@ -787,7 +925,11 @@ export default function ParcelMap() {
       await refreshOfflineAreas();
       displayOfflineArea(area);
       setActivePanel("offline");
-      setOfflineStatus(`${parcelCount.toLocaleString()} parcel${parcelCount === 1 ? "" : "s"} saved to this browser for offline review.`);
+      setOfflineStatus(
+        `${parcelCount.toLocaleString()} parcel${
+          parcelCount === 1 ? "" : "s"
+        } saved to this browser for offline review.`
+      );
     } catch (err) {
       setOfflineError(err instanceof Error ? err.message : "Unable to save area to this browser");
     } finally {
@@ -838,6 +980,7 @@ export default function ParcelMap() {
     const map = mapRef.current;
     if (!map?.getLayer(SATELLITE_LAYER_ID)) return;
     applyBasemapMode(map, basemapMode, streetLayerVisibilityRef.current, getParcelLayerConfig().minZoom);
+    applyOverlayPreferences(map);
   }, [basemapMode]);
 
   useEffect(() => {
@@ -845,6 +988,8 @@ export default function ParcelMap() {
     const map = mapRef.current;
     if (!map) return;
     map.getCanvas().style.cursor = activePanel === "measure" ? "crosshair" : "";
+    if (activePanel === "details" && selectedParcelRef.current)
+      focusMapOnSelectedParcel(map, selectedParcelRef.current);
   }, [activePanel]);
 
   useEffect(() => {
@@ -890,6 +1035,7 @@ export default function ParcelMap() {
       style: config.style,
       center: config.center,
       zoom: config.zoom,
+      hash: "map",
       refreshExpiredTiles: false,
       maxTileCacheZoomLevels: MAP_TILE_CACHE_ZOOM_LEVELS,
       attributionControl: {
@@ -897,7 +1043,14 @@ export default function ParcelMap() {
       }
     });
 
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false, visualizePitch: false }), "top-right");
+    map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "top-right");
+    map.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: "imperial" }), "bottom-left");
+    map.addControl(
+      new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: false }),
+      "top-right"
+    );
+    const resizeObserver = new ResizeObserver(() => map.resize());
+    resizeObserver.observe(mapContainerRef.current);
     mapRef.current = map;
     const parcelLayerConfig = getParcelLayerConfig();
 
@@ -955,13 +1108,15 @@ export default function ParcelMap() {
         const shouldShowGeoJsonParcels = !parcelLayerConfig.vectorTilesEnabled || Boolean(payload.demo);
         setParcelGeoJsonLayerVisibility(shouldShowGeoJsonParcels);
         setGeoJsonSourceData(mapRef.current, "parcels", shouldShowGeoJsonParcels ? data : EMPTY_FEATURE_COLLECTION);
-        setVisibleCount(shouldShowGeoJsonParcels ? data.features.length : (payload.count ?? 0));
+        setVisibleCount(shouldShowGeoJsonParcels ? data.features.length : payload.count ?? 0);
         setTotalInView(payload.count ?? data.features.length);
         setStatusMessage(
           payload.message ??
             (parcelLayerConfig.vectorTilesEnabled
               ? "Parcel vector tiles active. Click a parcel for full details."
-              : `${data.features.length.toLocaleString()} parcel outline${data.features.length === 1 ? "" : "s"} loaded.`)
+              : `${data.features.length.toLocaleString()} parcel outline${
+                  data.features.length === 1 ? "" : "s"
+                } loaded.`)
         );
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -1020,6 +1175,7 @@ export default function ParcelMap() {
     }
 
     async function selectParcelAt(lng: number, lat: number) {
+      const requestId = ++selectionRequestRef.current;
       setError(null);
       try {
         const response = await fetch(`/api/parcels/lookup?lng=${lng}&lat=${lat}`);
@@ -1029,6 +1185,7 @@ export default function ParcelMap() {
           throw new Error(payload.error ?? "Unable to look up parcel");
         }
 
+        if (selectionRequestRef.current !== requestId) return;
         const nextParcel = payload.data ?? null;
         if (nextParcel && nextParcel.properties.id === selectedParcelRef.current?.properties.id) {
           setSelectedParcelFeature(null);
@@ -1038,6 +1195,7 @@ export default function ParcelMap() {
 
         setSelectedParcelFeature(nextParcel);
       } catch (err) {
+        if (selectionRequestRef.current !== requestId) return;
         setError(err instanceof Error ? err.message : "Unable to look up parcel");
       }
     }
@@ -1162,7 +1320,9 @@ export default function ParcelMap() {
       if (parcelLayerConfig.vectorTilesEnabled) {
         map.addSource(PARCEL_TILE_SOURCE_ID, {
           type: "vector",
-          tiles: [`${window.location.origin}/api/parcels/tiles/{z}/{x}/{y}?v=${process.env.NEXT_PUBLIC_PARCEL_DATASET_VERSION}`],
+          tiles: [
+            `${window.location.origin}/api/parcels/tiles/{z}/{x}/{y}?v=${process.env.NEXT_PUBLIC_PARCEL_DATASET_VERSION}`
+          ],
           minzoom: parcelLayerConfig.minZoom,
           maxzoom: 22
         });
@@ -1175,15 +1335,7 @@ export default function ParcelMap() {
           minzoom: parcelLayerConfig.minZoom,
           paint: {
             "fill-color": "#2563eb",
-            "fill-opacity": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              parcelLayerConfig.minZoom,
-              0.03,
-              16,
-              0.08
-            ]
+            "fill-opacity": ["interpolate", ["linear"], ["zoom"], parcelLayerConfig.minZoom, 0.03, 16, 0.08]
           }
         });
 
@@ -1196,15 +1348,7 @@ export default function ParcelMap() {
           paint: {
             "line-color": STREET_PARCEL_LINE_COLOR,
             "line-opacity": getStreetParcelTileLineOpacity(parcelLayerConfig.minZoom),
-            "line-width": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              parcelLayerConfig.minZoom,
-              0.55,
-              17,
-              1.25
-            ]
+            "line-width": ["interpolate", ["linear"], ["zoom"], parcelLayerConfig.minZoom, 0.55, 17, 1.25]
           }
         });
       }
@@ -1329,10 +1473,17 @@ export default function ParcelMap() {
       });
 
       applyBasemapMode(map, basemapModeRef.current, streetLayerVisibilityRef.current, parcelLayerConfig.minZoom);
+      applyOverlayPreferences(map);
       queueVisibleParcelLoad(0);
     });
 
     map.on("moveend", () => {
+      const center = map.getCenter();
+      setCoordinate(
+        `${Math.abs(center.lat).toFixed(5)}° ${center.lat >= 0 ? "N" : "S"} · ${Math.abs(center.lng).toFixed(5)}° ${
+          center.lng >= 0 ? "E" : "W"
+        } · z${map.getZoom().toFixed(1)}`
+      );
       queueVisibleParcelLoad();
     });
 
@@ -1353,6 +1504,7 @@ export default function ParcelMap() {
         return;
       }
 
+      selectionRequestRef.current += 1;
       if (clickedParcel.parcelId && clickedParcel.parcelId === selectedParcelRef.current?.properties.id) {
         setSelectedParcelFeature(null);
         setStatusMessage("Parcel unselected.");
@@ -1374,6 +1526,8 @@ export default function ParcelMap() {
     return () => {
       parcelAbortRef.current?.abort();
       cancelQueuedVisibleParcelLoad();
+      resizeObserver.disconnect();
+      searchAbortRef.current?.abort();
       map.remove();
       mapRef.current = null;
       streetLayerVisibilityRef.current = {};
@@ -1454,7 +1608,7 @@ export default function ParcelMap() {
     setSearchError(null);
 
     try {
-      const params = new URLSearchParams({ q: query, limit: "12" });
+      const params = new URLSearchParams({ q: query, limit: "50" });
       const response = await fetch(`/api/parcels/search?${params.toString()}`, { signal: controller.signal });
       const payload = (await response.json()) as SearchPayload;
 
@@ -1462,6 +1616,7 @@ export default function ParcelMap() {
         throw new Error(payload.error ?? "Parcel search failed");
       }
 
+      if (controller.signal.aborted) return;
       setSearchResults(payload.data);
       if (payload.data.length === 0) setSearchError("No parcel matches found.");
     } catch (err) {
@@ -1474,6 +1629,8 @@ export default function ParcelMap() {
 
   async function selectSearchResult(result: ParcelSearchResult) {
     if (!result.center) return;
+    const requestId = ++selectionRequestRef.current;
+    setError(null);
     const [lng, lat] = result.center.coordinates;
     const map = mapRef.current;
 
@@ -1482,6 +1639,7 @@ export default function ParcelMap() {
       const payload = (await response.json()) as { ok?: boolean; data?: ParcelFeature | null; error?: string };
       if (!response.ok || !payload.ok) throw new Error(payload.error ?? "Unable to load selected parcel");
 
+      if (selectionRequestRef.current !== requestId) return;
       const nextParcel = payload.data ?? null;
       setSelectedParcelState(nextParcel);
       if (nextParcel) setActivePanel("details");
@@ -1496,6 +1654,7 @@ export default function ParcelMap() {
       );
       if (map && nextParcel) focusMapOnSelectedParcel(map, nextParcel);
     } catch (err) {
+      if (selectionRequestRef.current !== requestId) return;
       setError(err instanceof Error ? err.message : "Unable to load selected parcel");
     }
   }
@@ -1527,10 +1686,7 @@ export default function ParcelMap() {
 
   if (authData?.authEnabled && !authData.authenticated) {
     const canCreateAccount = Boolean(authData.accountCreationEnabled);
-    const signupDisabled =
-      !signupEmail.trim() ||
-      signupPassword.length < 8 ||
-      signupPassword !== signupPasswordConfirm;
+    const signupDisabled = !signupEmail.trim() || signupPassword.length < 8 || signupPassword !== signupPasswordConfirm;
 
     return (
       <div className="map-layout">
@@ -1538,7 +1694,7 @@ export default function ParcelMap() {
           {authMode === "sign-in" ? (
             <>
               <h2>Private parcel workspace</h2>
-              <p>Sign in to view Houghton County parcel data and saved projects.</p>
+              <p>Sign in to explore Upper Peninsula parcel records and your saved projects.</p>
               <form className="form-stack" onSubmit={login}>
                 <label>
                   Email or username
@@ -1644,31 +1800,49 @@ export default function ParcelMap() {
   }
 
   return (
-    <div className="map-layout">
+    <div className={`map-layout workspace-layout ${activePanel === "map" ? "panel-collapsed" : "panel-open"}`}>
       <div className="map-wrap">
         <div ref={mapContainerRef} className="map-canvas" />
-        <button
-          className="map-basemap-button"
-          type="button"
-          aria-label={basemapMode === "streets" ? "Switch to satellite view" : "Switch to map view"}
-          aria-pressed={basemapMode === "satellite"}
-          title={basemapMode === "streets" ? "Switch to satellite view" : "Switch to map view"}
-          onClick={() => setBasemapMode((current) => (current === "streets" ? "satellite" : "streets"))}
-        >
-          <span className="map-basemap-icon">{basemapMode === "streets" ? <TreeIcon /> : <GlobeIcon />}</span>
-        </button>
       </div>
+      <WorkspaceChrome
+        panel={activePanel}
+        onPanel={setActivePanel}
+        basemap={basemapMode}
+        onBasemap={setBasemapMode}
+        boundaries={boundaries}
+        onBoundaries={setBoundaries}
+        labels={labels}
+        onLabels={setLabels}
+        opacity={fillOpacity}
+        onOpacity={setFillOpacity}
+        compareCount={compareParcels.length}
+        online={online}
+        onHome={() => goToMarket(getMapConfig().center)}
+        onShare={copyMapLink}
+        onFullscreen={toggleFullscreen}
+        onSignOut={authData?.authEnabled ? signOut : undefined}
+        userName={authData?.user?.displayName || "Realtor"}
+        coordinate={coordinate}
+        status={activePanel === "measure" ? "Measurement mode · click the map to add points" : statusMessage}
+        error={error}
+        loading={loading}
+        toast={toast}
+      />
       <ParcelDetails
         activePanel={activePanel}
         onActivePanelChange={setActivePanel}
         parcel={selectedParcel}
-        visibleCount={visibleCount}
-        totalInView={totalInView}
-        loading={loading}
-        error={error}
-        statusMessage={statusMessage}
+        recentParcels={recentParcels}
+        compareParcels={compareParcels}
+        onRecentSelect={selectRecentParcel}
+        onCompareToggle={toggleComparison}
+        onCompareRemove={(id) => setCompareParcels((items) => items.filter((p) => p.properties.id !== id))}
+        onMarketSelect={goToMarket}
+        onFocusParcel={() => {
+          if (selectedParcel && mapRef.current) focusMapOnSelectedParcel(mapRef.current, selectedParcel);
+        }}
         searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
+        onSearchQueryChange={changeSearchQuery}
         onSearchSubmit={runSearch}
         searchResults={searchResults}
         searchLoading={searchLoading}

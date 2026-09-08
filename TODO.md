@@ -1,3 +1,15 @@
+# Workspace UI refresh
+
+- [x] Desktop navigation rail and property sidebar; mobile bottom navigation and expandable panel.
+- [x] Property boundary preview, overview/source tabs, workflow tag picker and session note drafts.
+- [x] Three-parcel comparison and selected/result/project/comparison CSV exports.
+- [x] Printable brief preview and print stylesheet.
+- [x] Search-result county, acreage and source-class filters, sorting, and clear result limits.
+- [x] Saved-project/property/note filtering and workflow tag filters.
+- [x] Layer settings, fill opacity, geolocation control, compass/scale, fullscreen and map links.
+- [x] Local desktop/mobile verification, save/tag/note round trip, CSV file validation, and automated checks.
+- [ ] Deploy the UI refresh and verify it on production.
+
 # Static parcel migration
 
 - [x] Export and verify all 232,191 parcels across 15 sources.
@@ -79,14 +91,14 @@ and deployment instructions are in docs/STATIC_PARCELS.md.
 
 ## Realtor-specific features
 
-- [ ] Saved parcel tags.
+- [x] Saved parcel tags.
 - [ ] Lead/prospecting notes.
 - [ ] Showing notes.
-- [ ] Basic printable property brief.
+- [x] Basic printable property brief.
 - [x] Measurement tools for distance/area.
 - [x] Browser-saved offline parcel area downloads.
 - [ ] Absentee owner hint when owner mailing address differs from site address.
-- [ ] Simple acreage/land-use filters.
+- [x] Acreage/land-use filters for returned search results (not dataset-wide filters).
 
 ## Production
 
@@ -127,7 +139,7 @@ and deployment instructions are in docs/STATIC_PARCELS.md.
 - [ ] Deploy this pass and verify live map tiles, search, sign-in, saved-project list, click lookup, and save flow.
 - [ ] Add project/saved-parcel edit/delete actions with owner-scoped API routes.
 - [ ] Add import-job logging before any automated data refresh work.
-- [ ] Add a printable parcel brief/export view for selected and saved parcels.
+- [x] Add a printable selected parcel brief and CSV export for selected/saved parcels.
 
 ## Later
 
