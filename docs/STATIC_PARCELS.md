@@ -10,6 +10,29 @@ This still uses Vercel functions for parcel API requests. It removes the bulk
 PostGIS storage and query load; it does not make the app backend-free. Tiles are
 generated from indexed local geometry as needed. There is no additional service.
 
+Search uses a separate encrypted SQLite asset with a compact public-record table
+and a contentless FTS5 trigram index. Its optional `search` manifest entry shares
+the dataset version/key, with its own nonce, tag, checksum and parts. Only search
+functions receive this asset; map, lookup, saving and health functions receive the
+geometry asset. Original parcel records and UUIDs are unchanged. Releases without
+a search asset retain the original complete search path.
+
+`npm run parcels:export-static` now creates both runtime assets. To add/rebuild
+only the search index for an existing immutable release, run
+`npm run parcels:build-search` with its existing Neon key available, then run the
+tests and build. This reads the dataset and key; it does not import parcels or
+change user data. Deploy the updated manifest with every referenced search part.
+The encrypted recovery archive is unchanged when rebuilding only the index.
+
+Search preserves literal matching, normalized APN ranking and result limits.
+Short queries and Unicode queries use the complete scan to preserve matching
+semantics. Per-instance caches are bounded to 128 queries / 4 MiB and 256 tiles /
+16 MiB. Authentication runs before every API handler, search is not stored in a
+shared response cache, and tile responses retain private browser caching.
+Cold starts and cache misses still perform extraction or tile generation.
+
+See [Performance measurements and verification](PERFORMANCE.md).
+
 ## Data access and files
 
 Some source notes restrict use to the private/internal app. Therefore, the public
@@ -21,7 +44,7 @@ exported. Dataset keys are stored only in `parcel_dataset_keys` in the existing
 Neon backend. Do not publish that table or the ignored plaintext export directory.
 
 On the first request per function instance, the server fetches one key, decrypts
-and verifies the SHA-256 of the dataset, and opens a read-only temporary SQLite
+and verifies the SHA-256 while streaming the required asset, and opens a read-only temporary SQLite
 file. Warm requests reuse the reader. A missing key or corrupt file fails closed;
 there is no silent fallback to the pruned Neon table. Node 24 is required in
 production. Cold starts have additional extraction time; monitor latency and

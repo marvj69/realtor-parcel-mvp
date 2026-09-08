@@ -31,5 +31,15 @@
     "20260908000111344.5.enc"
   ],
   "iv": "a0b2fb6c77816f4b3834f8f7",
-  "tag": "4cadf8b1112f7f80ea097843f7f409a7"
+  "tag": "4cadf8b1112f7f80ea097843f7f409a7",
+  "search": {
+    "parts": [
+      "20260908000111344.search.0.enc",
+      "20260908000111344.search.1.enc"
+    ],
+    "sqliteBytes": 162209792,
+    "sha256": "30bfa3f7ace5259aba4ee1425a35f6e0bdc208a16c4b8cdf8595e3a1ff28d39d",
+    "iv": "ade58f5c57a7a72274f07867",
+    "tag": "bf3fcebbf072729dcaf7508e6e66bc7a"
+  }
 }

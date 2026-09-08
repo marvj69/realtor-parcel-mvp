@@ -7,17 +7,21 @@ export type StoredParcel = ParcelRow & {
   updated_at: string;
 };
 
-export type DatasetManifest = {
-  format: 1;
-  version: string;
-  createdAt: string;
-  count: number;
-  sourceCounts: Record<string, number>;
+export type DatasetAsset = {
   sqliteBytes: number;
   sha256: string;
   parts: string[];
   iv: string;
   tag: string;
+};
+
+export type DatasetManifest = DatasetAsset & {
+  format: 1;
+  version: string;
+  createdAt: string;
+  count: number;
+  sourceCounts: Record<string, number>;
+  search?: DatasetAsset;
 };
 
 const packedFields = ["id","source_key","source_feature_id","provider","source_county","state",

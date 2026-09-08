@@ -5,12 +5,20 @@ import {resolve,dirname,join} from 'node:path';
 import {execFileSync} from 'node:child_process';
 const required=JSON.parse(readFileSync('config/next-runtime-files.json'));
 const routes=['auth/register','auth/session','health','parcels/bbox','parcels/lookup','parcels/search','parcels/tiles/[z]/[x]/[y]','projects','saved-parcels'];
+const manifest=JSON.parse(readFileSync('data/static-parcels/manifest.json'));
 for(const route of routes){
  const path=resolve('.next/server/app/api',route,'route.js.nft.json');
  const files=new Set(JSON.parse(readFileSync(path)).files.map(file=>resolve(dirname(path),file)));
  for(const file of required)assert.ok(files.has(resolve(file)),`${route} omits runtime dependency: ${file}`);
  assert.ok([...files].every(f=>!f.includes('/work/')&&!f.includes('/parcel-archive/')&&!/\/\.env/.test(f)),`${route} includes private files`);
  const bytes=[...files].reduce((sum,f)=>sum+statSync(f).size,0);assert.ok(bytes<250*1024**2,`${route} exceeds bundle limit`);
+ if(route.startsWith('parcels/') || route==='health' || route==='saved-parcels') {
+   const isSearch=route==='parcels/search' && manifest.search;
+   const expected=isSearch ? manifest.search.parts : manifest.parts;
+   for(const part of expected)assert.ok(files.has(resolve('data/static-parcels',part)),`${route} omits dataset part ${part}`);
+   const unneeded=isSearch ? manifest.parts : (manifest.search?.parts || []);
+   for(const part of unneeded)assert.ok(!files.has(resolve('data/static-parcels',part)),`${route} bundles unnecessary dataset part ${part}`);
+ }
 }
 const root=mkdtempSync(join(tmpdir(),'parcel-launcher-test-'));
 try{

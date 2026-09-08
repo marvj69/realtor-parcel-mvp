@@ -6,6 +6,7 @@ import { mkdir, readFile, stat, writeFile, rename, copyFile, rm } from "node:fs/
 import { pipeline } from "node:stream/promises";
 import { createGzip, gunzipSync } from "node:zlib";
 import { decodeParcel, encodeRuntimeParcel, type DatasetManifest } from "../src/lib/static-parcel-format";
+import { packageParcelSearch } from "./build-parcel-search";
 
 export async function packageStaticDataset(work:string,sourceCounts:Record<string,number>,client:Client,version:string) {
   await copyFile(`${work}/parcels.sqlite`,`${work}/runtime.sqlite`);
@@ -60,6 +61,7 @@ export async function packageStaticDataset(work:string,sourceCounts:Record<strin
     }
     const manifest:DatasetManifest={format:1,version,createdAt:new Date().toISOString(),count,sourceCounts,sqliteBytes,
       sha256:hash.digest("hex"),parts,iv:iv.toString("hex"),tag:cipher.getAuthTag().toString("hex")};
+    if (name === "runtime") manifest.search = await packageParcelSearch(input, work, manifest, key);
     await writeFile(`${directory}/manifest.json.tmp`,JSON.stringify(manifest,null,2)+"\n");
     console.log(JSON.stringify({name,count,sqliteBytes,encryptedBytes:encrypted.length,version}));
   }
