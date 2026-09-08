@@ -25,6 +25,11 @@ change user data. Deploy the updated manifest with every referenced search part.
 The encrypted recovery archive is unchanged when rebuilding only the index.
 
 Search preserves literal matching, normalized APN ranking and result limits.
+Owner names also match words in either order, with punctuation treated as word
+breaks and initials/partial names matched as word prefixes. Every entered word
+must match a distinct owner word; exact names rank above partial names. The
+existing trigram asset narrows candidates using a required name token, so no
+dataset rebuild or backend migration is needed.
 Short queries and Unicode queries use the complete scan to preserve matching
 semantics. Per-instance caches are bounded to 128 queries / 4 MiB and 256 tiles /
 16 MiB. Authentication runs before every API handler, search is not stored in a

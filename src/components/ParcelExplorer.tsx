@@ -66,6 +66,7 @@ export default function ParcelExplorer({
             <input
               id="parcel-search"
               autoComplete="off"
+              aria-describedby="owner-search-help"
               maxLength={120}
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}
@@ -92,6 +93,7 @@ export default function ParcelExplorer({
             <Icon name="arrow" size={17} />
           </button>
         </form>
+        <p id="owner-search-help">Owner names work in either order. Try a last name, first and last name, or business name.</p>
         <div className="search-tools">
           <button
             className={showFilters ? "text-button active" : "text-button"}

@@ -34,7 +34,7 @@ source.exec(`CREATE TABLE parcels(n INTEGER PRIMARY KEY,id TEXT,payload BLOB,
   apn TEXT,parcel_id TEXT,site_address TEXT,owner_name TEXT,mailing_address TEXT,land_use TEXT,
   apn_norm TEXT,parcel_norm TEXT)`);
 const put = source.prepare("INSERT INTO parcels VALUES(?,?,?,?,?,?,?,?,?,?,?)");
-const owners = ['Heinonen', 'EXAMPLE OWNER', 'O"Brien', '100% Trust', 'A_B', 'José', 'AB HOLDINGS'];
+const owners = ['Heinonen', 'EXAMPLE OWNER', 'O"Brien', '100% Trust', 'A_B', 'José', 'AB HOLDINGS', 'SMITH, JOHN A', 'JOHN SMITH', 'SMITH, JOHNNY', 'SMITH, JANE', 'ACME LAND HOLDINGS LLC', 'SMITH, JOHN & JANE'];
 for (let i = 0; i < 100; i++) {
   const apn = i < 2 ? ["AB-12-34", "AB-12-345"][i] : `044-127-${String(i).padStart(3, "0")}-00`;
   const parcel = { id: String(i), source_key: "test", source_feature_id: String(i), provider: "fixture",
@@ -72,4 +72,19 @@ test("cached search results cannot be changed by a caller and limits have separa
   first.pop();
   assert.deepEqual(indexed.search("Lake Linden", 8), original.search("Lake Linden", 8));
   assert.equal(indexed.search("Lake Linden", 1).length, 1);
+});
+
+
+test("owner names match reordered words, middle initials, businesses and prefixes without unrelated owners", () => {
+  for (const query of ["John Smith", "Smith John", "  john   smith  ", "J Smith", "John A Smith", "Land Acme", "Smith Jane John"]) {
+    assert.deepEqual(indexed.search(query, 50), original.search(query, 50), query);
+    assert.ok(indexed.search(query, 50).length > 0, query);
+  }
+  const names = indexed.search("John Smith", 50);
+  assert.equal(names[0].ownerName, "JOHN SMITH");
+  assert.ok(names.some(p => p.ownerName === "SMITH, JOHN A"));
+  assert.ok(!names.some(p => p.ownerName === "SMITH, JANE"));
+  assert.ok(names.every(p => p.matchKind === "owner_name"));
+  assert.equal(indexed.search("Smith Smith", 50).length, 0);
+  assert.equal(indexed.search("John Missingname", 50).length, 0);
 });
