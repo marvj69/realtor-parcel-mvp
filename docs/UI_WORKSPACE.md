@@ -25,6 +25,17 @@ as market value. The printed brief includes provenance and the full disclaimer.
 Use Print / Save PDF in a browser with print support; the preview remains usable
 in embedded browsers whose host does not implement a native print dialog.
 
+Selecting a parcel automatically calculates approximate acreage, boundary
+perimeter in feet, and overall east–west/north–south spans from its available
+geometry using Turf geodesic measurements. These appear beside the unchanged
+recorded acreage and in the printable brief. Spans are compass-aligned extents,
+not frontage or individual side lengths. Polygon holes are subtracted from area
+and included in perimeter; all MultiPolygon parts are combined (spans can cross
+gaps). Missing, non-finite, unclosed, or zero-area geometry shows measurements
+unavailable. Offline selections use the geometry saved in the offline area,
+which may be less detailed than a full online lookup. Calculations run locally
+without another API request or any changes to stored source records.
+
 Recent selections, comparisons (maximum three), and unsaved notes live only in
 page memory. Switching panels preserves note drafts. Reloading discards them;
 Save to project persists notes and tags through the existing API. Project search

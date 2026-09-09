@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "@/components/Icon";
 import ParcelOutline from "@/components/ParcelOutline";
+import ParcelMeasurements from "@/components/ParcelMeasurements";
+import { measureParcel } from "@/lib/parcel-measurements";
 import {
   displayMoney,
   displayRecordDate,
@@ -53,6 +55,7 @@ export default function ParcelInspector({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const p = parcel.properties;
+  const measurements = useMemo(() => measureParcel(parcel.geometry), [parcel.geometry]);
   const sourceUrl = safeSourceUrl(p.sourceUrl);
 
   async function save() {
@@ -98,6 +101,7 @@ export default function ParcelInspector({
         Prepared {new Date().toLocaleDateString()} · {p.sourceCounty}, {p.state}
       </p>
       <ParcelOutline parcel={parcel} />
+      <ParcelMeasurements measurements={measurements} />
       <dl className="record-list">
         {[
           ["Parcel ID", p.parcelId],
@@ -151,6 +155,7 @@ export default function ParcelInspector({
             <small>Assessment, not market value</small>
           </div>
         </div>
+        <ParcelMeasurements measurements={measurements} />
         <div className="parcel-actions">
           <button className="primary-button" onClick={() => setTab("notes")}>
             <Icon name="folder" size={17} /> Save property

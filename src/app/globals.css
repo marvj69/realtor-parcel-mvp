@@ -1169,6 +1169,18 @@ kbd {
   margin: 0;
   overflow-wrap: anywhere;
 }
+.parcel-measurements {
+  margin: 18px 0;
+}
+.measurement-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 14px;
+  margin-bottom: 10px;
+}
+.measurement-facts dd {
+  font-weight: 650;
+}
 .disclosure {
   border: 1px solid var(--border);
   border-radius: 7px;
