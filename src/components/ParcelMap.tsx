@@ -605,11 +605,12 @@ export default function ParcelMap() {
   const mapRef = useRef<MapLibre.Map | null>(null);
   const parcelAbortRef = useRef<AbortController | null>(null);
   const parcelDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const parcelIdleLoadRef = useRef<(() => void) | null>(null);
+  const parcelRefreshRef = useRef<(() => void) | null>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
   const selectionRequestRef = useRef(0);
   const lookupAbortRef = useRef<AbortController | null>(null);
   const basemapModeRef = useRef<BasemapMode>("streets");
+  const satelliteLabelsReadyRef = useRef(false);
   const activePanelRef = useRef<AppPanel>("search");
   const measurementModeRef = useRef<MeasurementMode>("distance");
   const selectedParcelRef = useRef<ParcelFeature | null>(null);
@@ -696,6 +697,17 @@ export default function ParcelMap() {
 
   function applyOverlayPreferences(map: MapLibre.Map) {
     const prefs = overlayPreferencesRef.current;
+    const vectorTilesActive = Boolean(map.getSource(PARCEL_TILE_SOURCE_ID));
+    for (const id of [
+      PARCEL_TILE_LINE_LAYER_ID, PARCEL_TILE_FILL_LAYER_ID,
+      PARCEL_GEOJSON_LINE_LAYER_ID, PARCEL_GEOJSON_FILL_LAYER_ID,
+      OFFLINE_PARCEL_LINE_LAYER_ID, OFFLINE_PARCEL_FILL_LAYER_ID
+    ]) {
+      if (!map.getLayer(id)) continue;
+      const isGeoJsonFallback = id === PARCEL_GEOJSON_LINE_LAYER_ID || id === PARCEL_GEOJSON_FILL_LAYER_ID;
+      // Invisible paint still requests tiles; hide the layers to stop that work.
+      map.setLayoutProperty(id, "visibility", prefs.boundaries && !(isGeoJsonFallback && vectorTilesActive) ? "visible" : "none");
+    }
     for (const id of [PARCEL_TILE_LINE_LAYER_ID, PARCEL_GEOJSON_LINE_LAYER_ID, OFFLINE_PARCEL_LINE_LAYER_ID]) {
       if (map.getLayer(id)) map.setPaintProperty(id, "line-opacity", prefs.boundaries ? 0.85 : 0);
     }
@@ -707,14 +719,16 @@ export default function ParcelMap() {
         map.setLayoutProperty(
           id,
           "visibility",
-          prefs.labels && basemapModeRef.current === "satellite" ? "visible" : "none"
+          prefs.labels && satelliteLabelsReadyRef.current && basemapModeRef.current === "satellite" ? "visible" : "none"
         );
     }
   }
 
   useEffect(() => {
+    const boundariesChanged = overlayPreferencesRef.current.boundaries !== boundaries;
     overlayPreferencesRef.current = { boundaries, labels, fillOpacity };
     if (mapRef.current) applyOverlayPreferences(mapRef.current);
+    if (boundariesChanged) parcelRefreshRef.current?.();
   }, [boundaries, labels, fillOpacity]);
 
   function selectRecentParcel(parcel: ParcelFeature) {
@@ -1093,9 +1107,10 @@ export default function ParcelMap() {
       const zoom = mapRef.current.getZoom();
       const minZoom = parcelLayerConfig.minZoom;
 
-      if (zoom < minZoom) {
+      if (zoom < minZoom || !overlayPreferencesRef.current.boundaries) {
         parcelAbortRef.current?.abort();
-        clearParcels("Zoom in to view parcels.");
+        setLoading(false);
+        clearParcels(zoom < minZoom ? "Zoom in to view parcels." : "Parcel boundaries hidden.");
         return;
       }
 
@@ -1124,7 +1139,9 @@ export default function ParcelMap() {
         }
 
         const data = payload.data ?? EMPTY_FEATURE_COLLECTION;
-        const shouldShowGeoJsonParcels = !parcelLayerConfig.vectorTilesEnabled || Boolean(payload.demo);
+        if (controller.signal.aborted) return;
+        const shouldShowGeoJsonParcels = overlayPreferencesRef.current.boundaries &&
+          (!parcelLayerConfig.vectorTilesEnabled || Boolean(payload.demo));
         setParcelGeoJsonLayerVisibility(shouldShowGeoJsonParcels);
         setGeoJsonSourceData(mapRef.current, "parcels", shouldShowGeoJsonParcels ? data : EMPTY_FEATURE_COLLECTION);
         setStatusMessage(
@@ -1148,15 +1165,16 @@ export default function ParcelMap() {
     function cancelQueuedVisibleParcelLoad() {
       if (parcelDebounceRef.current) clearTimeout(parcelDebounceRef.current);
       parcelDebounceRef.current = null;
-
-      if (parcelIdleLoadRef.current) {
-        map.off("idle", parcelIdleLoadRef.current);
-        parcelIdleLoadRef.current = null;
-      }
     }
 
     function queueVisibleParcelLoad(delay = 220) {
       cancelQueuedVisibleParcelLoad();
+      if (!overlayPreferencesRef.current.boundaries) {
+        parcelAbortRef.current?.abort();
+        setLoading(false);
+        setStatusMessage("Parcel boundaries hidden.");
+        return;
+      }
       if (parcelLayerConfig.vectorTilesEnabled) {
         if (!map.getSource(PARCEL_TILE_SOURCE_ID)) return;
         const showParcels = map.getZoom() >= parcelLayerConfig.minZoom;
@@ -1167,20 +1185,11 @@ export default function ParcelMap() {
       parcelDebounceRef.current = setTimeout(() => {
         parcelDebounceRef.current = null;
 
-        const runVisibleParcelLoad = () => {
-          parcelIdleLoadRef.current = null;
-          void loadVisibleParcels();
-        };
-
-        if (map.areTilesLoaded()) {
-          runVisibleParcelLoad();
-          return;
-        }
-
-        parcelIdleLoadRef.current = runVisibleParcelLoad;
-        map.once("idle", runVisibleParcelLoad);
+        // Parcel requests must not wait for unrelated public basemap tiles.
+        void loadVisibleParcels();
       }, delay);
     }
+    parcelRefreshRef.current = queueVisibleParcelLoad;
 
     function setSelectedParcelFeature(nextParcel: ParcelFeature | null) {
       setSelectedParcelState(nextParcel);
@@ -1227,7 +1236,9 @@ export default function ParcelMap() {
       }
     }
 
-    map.on("load", () => {
+    // `load` waits for visible raster tiles. Install independent sources as soon
+    // as the style exists so a slow topo provider cannot block satellite/parcels.
+    map.once("style.load", () => {
       streetLayerVisibilityRef.current = captureStreetBasemapLayerVisibility(map);
 
       map.addSource(SATELLITE_SOURCE_ID, {
@@ -1250,10 +1261,7 @@ export default function ParcelMap() {
         }
       };
 
-      if (config.satelliteDetailTileUrl) {
-        satelliteLayer.maxzoom = Math.max(config.satelliteDetailMinZoom, 0) + SATELLITE_DETAIL_FADE_ZOOM_DELTA;
-      }
-
+      // Keep base imagery beneath optional detail tiles while they load.
       map.addLayer(satelliteLayer);
 
       if (config.satelliteDetailTileUrl) {
@@ -1274,7 +1282,6 @@ export default function ParcelMap() {
           type: "raster",
           source: SATELLITE_DETAIL_SOURCE_ID,
           minzoom: detailMinZoom,
-          maxzoom: detailMaxZoom,
           layout: {
             visibility: basemapModeRef.current === "satellite" ? "visible" : "none"
           },
@@ -1506,9 +1513,16 @@ export default function ParcelMap() {
 
     map.on("sourcedata", event => {
       if (event.sourceId === PARCEL_TILE_SOURCE_ID && event.isSourceLoaded) setLoading(false);
+      if (
+        event.sourceId === SATELLITE_SOURCE_ID && event.tile &&
+        event.isSourceLoaded && !satelliteLabelsReadyRef.current
+      ) {
+        satelliteLabelsReadyRef.current = true;
+        applyOverlayPreferences(map);
+      }
     });
     map.on("sourcedataloading", event => {
-      if (event.sourceId === PARCEL_TILE_SOURCE_ID) setLoading(true);
+      if (event.sourceId === PARCEL_TILE_SOURCE_ID && overlayPreferencesRef.current.boundaries) setLoading(true);
     });
     map.on("error", event => {
       if ("sourceId" in event && event.sourceId === PARCEL_TILE_SOURCE_ID) {
@@ -1572,6 +1586,8 @@ export default function ParcelMap() {
       lookupAbortRef.current?.abort();
       map.remove();
       mapRef.current = null;
+      parcelRefreshRef.current = null;
+      satelliteLabelsReadyRef.current = false;
       streetLayerVisibilityRef.current = {};
     };
   }, [authData?.authenticated, authData?.vectorTilesAvailable, authLoading, mapLibraryReady]);

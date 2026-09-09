@@ -21,7 +21,8 @@
     "parcels:prune": "tsx scripts/prune-static-parcels.ts",
     "parcels:restore": "tsx scripts/restore-static-parcels.ts",
     "parcels:verify-static": "tsx scripts/verify-static-parcels.ts",
-    "test:ui": "node --import tsx --test tests/parcel-presentation.test.ts"
+    "test:ui": "node --import tsx --test tests/parcel-presentation.test.ts",
+    "test:map": "node scripts/verify-map-loading.mjs"
   },
   "dependencies": {
     "@turf/turf": "latest",
@@ -47,6 +48,7 @@
     "@types/vt-pbf": "^3.1.1",
     "eslint": "latest",
     "eslint-config-next": "latest",
+    "playwright": "1.61.1",
     "proj4": "^2.20.8",
     "tsx": "latest",
     "typescript": "latest"

@@ -1,4 +1,78 @@
-# Performance verification — September 7, 2026
+# Performance verification
+
+## Satellite loading — September 9, 2026
+
+Satellite and parcel sources previously initialized on MapLibre's `load` event,
+which waits for the initial visible map to load. A slow USGS topo tile therefore
+blocked satellite switching and parcel outlines. Sources now initialize on
+`style.load`, before raster tile completion. The GeoJSON fallback also fetches
+after its viewport debounce without waiting for unrelated imagery to become idle.
+See [MapLibre map events](https://maplibre.org/maplibre-gl-js/docs/API/interfaces/MapEventType/).
+
+The initial satellite view gives imagery priority over the two reference-label
+overlays. Labels begin after the visible base imagery tiles complete, then remain
+available for subsequent pans and switches. Optional high-zoom detail imagery
+keeps the base underneath while loading and overzooms from its source's native
+maximum rather than disappearing at that zoom.
+
+Turning parcel boundaries off now hides the corresponding layers and pauses
+GeoJSON requests. Previously only paint opacity changed, so invisible vector
+tiles continued to download and process. Restoring boundaries resumes loading.
+Selection highlights, source attribution, and the boundary disclaimer remain.
+
+### Measurements and limits
+
+The controlled browser check holds every topo tile indefinitely. Before the fix,
+neither imagery nor parcel requests began during a three-second hold; the first
+imagery request began 3.42 seconds after clicking Satellite, after releasing topo.
+On the optimized local build after the fix, imagery requests began about 0.18–0.49
+seconds after clicking while topo was still held. Both vector and GeoJSON parcel
+requests started independently. These are request-start timings, not full-render
+or production latency claims. Fixtures isolate this test from public-service speed.
+
+Both parcel modes made **zero** new parcel requests when moving from Houghton to
+Marquette with boundaries hidden, and resumed requests when re-enabled. Labels
+made no requests while the initial imagery was held and loaded when released.
+
+Live provider sampling returned Michigan imagery tiles in approximately 0.37–0.58
+seconds at zooms 13, 16, and 19. One USGS topo tile took 10.41 seconds. Actual browser
+first-imagery response measurements also varied between runs (approximately 0.65
+and 6.84 seconds). Provider/network latency is still variable; this change removes
+the app's dependency on topo completion, not delays within the imagery service.
+The existing public providers, tile resolution, private-data architecture, and
+operating-cost model are unchanged.
+
+The read-only backend check used Node 24.18.0 and dataset `20260908000111344`
+(230,386 parcels). Sampled cached searches took 0.002–0.16 ms and cached tiles
+0.001–0.04 ms. Geometry open took 667 ms, search-asset open 161 ms, and first dense
+z13 tiles 83–92 ms. Two-character and non-indexable searches still require scans
+(about 315–325 ms here) to preserve matching behavior. These are local CPU/asset
+timings; no backend regression or need for a new paid service was found.
+
+### Reproduce
+
+Use Node 24 and the existing private local environment. Run `npm run build`, then
+`npm run start -- --hostname 127.0.0.1 --port 3100`. Install the test browser once
+with `npx playwright install chromium`, then run `npm run test:map` in another
+terminal. The browser check expects the default public basemaps and a local server
+with the static parcel dataset available. It makes only read requests to parcel
+APIs; public map tiles are deterministic image fixtures. It also exercises the
+GeoJSON path by changing the session response's vector-capability flag in that
+isolated test context.
+
+`PARCEL_MAP_TEST_URL` overrides the local URL. For a protected local server,
+`PARCEL_MAP_TEST_STORAGE_STATE` can point to a private Playwright session file;
+keep it outside Git. Results are written to ignored
+`work/map-loading-verification.json`. Optional `PARCEL_MAP_TEST_CDP_URL` connects
+to a dedicated existing test browser. Live imagery must be checked separately.
+
+Validation: 24 tests, lint, typecheck, and the production build/bundle checks pass.
+Browser regression checks pass on both development and optimized local builds.
+Real-provider checks on the optimized build covered desktop/mobile satellite
+imagery, reference labels, owner search, parcel details, and selection highlights.
+Local measurements are not a production deployment verification.
+
+## Search and storage — September 7, 2026
 
 Measured with Node 24.18.0 on the same Mac and the unchanged 230,386-parcel dataset
 `20260908000111344`. These are local server CPU timings, not promises about network
