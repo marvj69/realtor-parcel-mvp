@@ -1181,6 +1181,9 @@ kbd {
 .measurement-facts dd {
   font-weight: 650;
 }
+.measurement-facts .measurement-dimensions {
+  grid-column: 1 / -1;
+}
 .disclosure {
   border: 1px solid var(--border);
   border-radius: 7px;

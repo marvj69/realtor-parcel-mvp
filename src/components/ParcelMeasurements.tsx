@@ -1,4 +1,4 @@
-import { measurementAcres, measurementFeet, type ParcelMeasurements as Measurements } from "@/lib/parcel-measurements";
+import { measurementAcres, measurementDimensions, measurementFeet, type ParcelMeasurements as Measurements } from "@/lib/parcel-measurements";
 
 export default function ParcelMeasurements({ measurements }: { measurements: Measurements | null }) {
   return (
@@ -9,17 +9,25 @@ export default function ParcelMeasurements({ measurements }: { measurements: Mea
           <dl className="record-list measurement-facts">
             {[
               ["Calculated acreage", measurementAcres(measurements.acres)],
-              ["Boundary perimeter", measurementFeet(measurements.perimeterFeet)],
-              ["East–west span", measurementFeet(measurements.eastWestFeet)],
-              ["North–south span", measurementFeet(measurements.northSouthFeet)]
+              ["Boundary perimeter", measurementFeet(measurements.perimeterFeet)]
             ].map(([label, value]) => (
               <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
             ))}
+            {measurements.boundaries.map(boundary => (
+              <div className="measurement-dimensions" key={`${boundary.part}-${boundary.ring}`}>
+                <dt>
+                  {measurements.boundaries.some(item => item.part > 1) ? `Part ${boundary.part} · ` : ""}
+                  {boundary.ring ? `Interior boundary ${boundary.ring}` : "Dimensions"}
+                  {" · feet"}
+                </dt>
+                <dd>{measurementDimensions(boundary.sideLengthsFeet)}</dd>
+              </div>
+            ))}
           </dl>
           <p className="panel-note">
-            Calculated automatically from the available GIS boundary. Dimensions are overall compass spans,
-            not frontage or individual side lengths. Area excludes holes; perimeter includes their boundaries.
-            Separate parcel parts are combined, and spans may include gaps. Not a survey.
+            Clockwise from the northwest corner, returning to the start. Approximate GIS side lengths;
+            nearly straight segments are combined within 1 ft. Curves may show several lengths.
+            Each boundary is listed separately. Area excludes holes; perimeter includes them. Not a survey.
           </p>
         </>
       ) : (
