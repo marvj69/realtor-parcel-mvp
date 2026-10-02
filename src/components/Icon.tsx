@@ -28,7 +28,11 @@ const paths = {
   copy: "M8 8h13v13H8V8ZM16 8V3H3v13h5",
   arrow: "M4 12h16m-6-6 6 6-6 6",
   undo: "m8 4-5 5 5 5M3 9h12a6 6 0 0 1 0 12",
-  book: "M3 3h7a2 2 0 0 1 2 2v16a4 4 0 0 0-4-2H3V3Zm18 0h-7a2 2 0 0 0-2 2v16a4 4 0 0 1 4-2h5V3Z"
+  book: "M3 3h7a2 2 0 0 1 2 2v16a4 4 0 0 0-4-2H3V3Zm18 0h-7a2 2 0 0 0-2 2v16a4 4 0 0 1 4-2h5V3Z",
+  edit: "M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4",
+  locate: "m3 11 18-8-8 18-2-8-8-2Z",
+  chevronDown: "m6 9 6 6 6-6",
+  zoomIn: "m21 21-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0M10 7v6m-3-3h6"
 } as const;
 export type IconName = keyof typeof paths;
 

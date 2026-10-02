@@ -1,14 +1,17 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Icon from "@/components/Icon";
 import {
   displayValue,
   downloadParcelsCsv,
   EMPTY_RESULT_FILTERS,
   filterParcelResults,
-  parcelTitle
+  matchKindLabel,
+  ownerMailingHint,
+  parcelTitle,
+  type ResultFilters
 } from "@/lib/parcel-presentation";
-import type { ParcelFeature, ParcelSearchResult } from "@/types/parcel";
+import type { ParcelProperties, ParcelSearchResult } from "@/types/parcel";
 
 export const MARKETS = [
   { name: "Houghton", description: "Portage Lake & the Keweenaw", center: [-88.569, 47.1211] as [number, number] },
@@ -25,9 +28,12 @@ type Props = {
   loading: boolean;
   error: string | null;
   onSelect: (result: ParcelSearchResult) => void;
-  recent: ParcelFeature[];
-  onRecentSelect: (parcel: ParcelFeature) => void;
+  recent: ParcelProperties[];
+  onRecentSelect: (parcel: ParcelProperties) => void;
+  onRecentClear: () => void;
   onMarketSelect: (center: [number, number]) => void;
+  onVisibleResultsChange: (results: ParcelSearchResult[]) => void;
+  onFitResults: () => void;
 };
 
 export default function ParcelExplorer({
@@ -40,12 +46,25 @@ export default function ParcelExplorer({
   onSelect,
   recent,
   onRecentSelect,
-  onMarketSelect
+  onRecentClear,
+  onMarketSelect,
+  onVisibleResultsChange,
+  onFitResults
 }: Props) {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState(EMPTY_RESULT_FILTERS);
   const filtered = filterParcelResults(results, filters);
-  const filterCount = [filters.county, filters.minAcres, filters.maxAcres, filters.landUse].filter(Boolean).length;
+  const showingResults = query.trim().length >= 2 && results.length > 0;
+  const filterCount = [filters.county, filters.minAcres, filters.maxAcres, filters.landUse, filters.mailing].filter(
+    Boolean
+  ).length;
+  // The map pins exactly the results listed here, so report the displayed set when it changes.
+  const visibleKey = showingResults ? filtered.map((result) => result.id).join(",") : "";
+  useEffect(() => {
+    onVisibleResultsChange(showingResults ? filtered : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- visibleKey captures the displayed result set
+  }, [visibleKey]);
+  useEffect(() => () => onVisibleResultsChange([]), [onVisibleResultsChange]);
   const invalidRange = Boolean(
     filters.minAcres && filters.maxAcres && Number(filters.minAcres) > Number(filters.maxAcres)
   );
@@ -107,7 +126,7 @@ export default function ParcelExplorer({
         </div>
         {showFilters ? (
           <div className="filter-panel">
-            <p>Filter the returned results (up to 50 matches).</p>
+            <p>Filter the returned results (up to 50 matches). Mailing filters are hints from the recorded address.</p>
             <div className="filter-grid">
               <label>
                 County
@@ -129,6 +148,17 @@ export default function ParcelExplorer({
                       {use}
                     </option>
                   ))}
+                </select>
+              </label>
+              <label className="filter-wide">
+                Owner mailing address
+                <select
+                  value={filters.mailing}
+                  onChange={(e) => setFilters({ ...filters, mailing: e.target.value as ResultFilters["mailing"] })}
+                >
+                  <option value="">Any mailing address</option>
+                  <option value="differs">Differs from site or out of state</option>
+                  <option value="out-of-state">Out-of-state mailing address</option>
                 </select>
               </label>
               <label>
@@ -177,7 +207,7 @@ export default function ParcelExplorer({
           <div />
         </div>
       ) : null}
-      {query.trim().length >= 2 && results.length > 0 ? (
+      {showingResults ? (
         <section className="panel-section results-section">
           <div className="results-heading">
             <h3>
@@ -198,6 +228,15 @@ export default function ParcelExplorer({
             </select>
             <button
               className="icon-button"
+              disabled={!filtered.some((result) => result.center)}
+              title="Show these results on the map"
+              aria-label="Show these results on the map"
+              onClick={onFitResults}
+            >
+              <Icon name="map" size={17} />
+            </button>
+            <button
+              className="icon-button"
               disabled={!filtered.length}
               title="Export displayed results"
               aria-label="Export displayed results"
@@ -209,28 +248,35 @@ export default function ParcelExplorer({
           {results.length === 50 ? (
             <p className="panel-note">Top 50 matches. Refine your search for more specific results.</p>
           ) : null}
+          <p className="panel-note">Numbered pins on the map match this list.</p>
           <div className="search-results">
-            {filtered.map((result, index) => (
-              <button
-                key={result.id}
-                className="search-result"
-                onClick={() => onSelect(result)}
-                disabled={!result.center}
-              >
-                <div className="result-leading">
-                  <span className="result-number">{String(index + 1).padStart(2, "0")}</span>
-                  <span className="county-chip">{result.sourceCounty || "County unavailable"}</span>
-                  <Icon name="chevron" size={15} />
-                </div>
-                <strong className="result-title">{parcelTitle(result)}</strong>
-                <span className="result-owner">{result.ownerName || "Owner unavailable"}</span>
-                <div className="result-facts">
-                  <span>{result.acreage === null ? "Acres unavailable" : `${displayValue(result.acreage)} acres`}</span>
-                  <span>{result.landUse || "Class unavailable"}</span>
-                </div>
-                <span className="result-apn">{result.apn || result.parcelId || "Parcel ID unavailable"}</span>
-              </button>
-            ))}
+            {filtered.map((result, index) => {
+              const matchLabel = matchKindLabel(result.matchKind);
+              const hint = ownerMailingHint(result);
+              return (
+                <button
+                  key={result.id}
+                  className="search-result"
+                  onClick={() => onSelect(result)}
+                  disabled={!result.center}
+                >
+                  <div className="result-leading">
+                    <span className="result-number">{index + 1}</span>
+                    <span className="county-chip">{result.sourceCounty || "County unavailable"}</span>
+                    {matchLabel ? <span className="match-chip">{matchLabel}</span> : null}
+                    <Icon name="chevron" size={15} />
+                  </div>
+                  <strong className="result-title">{parcelTitle(result)}</strong>
+                  <span className="result-owner">{result.ownerName || "Owner unavailable"}</span>
+                  <div className="result-facts">
+                    <span>{result.acreage === null ? "Acres unavailable" : `${displayValue(result.acreage)} acres`}</span>
+                    <span>{result.landUse || "Class unavailable"}</span>
+                    {hint ? <span className="fact-hint">{hint.kind === "out-of-state" ? hint.label : "Mailing differs"}</span> : null}
+                  </div>
+                  <span className="result-apn">{result.apn || result.parcelId || "Parcel ID unavailable"}</span>
+                </button>
+              );
+            })}
           </div>
           {!filtered.length ? (
             <div className="empty-state">
@@ -252,22 +298,23 @@ export default function ParcelExplorer({
                   <Icon name="clock" size={17} />
                   Recently viewed
                 </h3>
-                <span className="subtle">This session</span>
+                <button className="text-button" type="button" onClick={onRecentClear}>
+                  Clear
+                </button>
               </div>
               <div className="recent-list">
                 {recent.slice(0, 5).map((p) => (
-                  <button key={p.properties.id} onClick={() => onRecentSelect(p)}>
+                  <button key={p.id} onClick={() => onRecentSelect(p)}>
                     <Icon name="pin" size={17} />
                     <span>
-                      <strong>{parcelTitle(p.properties)}</strong>
-                      <small>
-                        {p.properties.sourceCounty} · {p.properties.parcelId}
-                      </small>
+                      <strong>{parcelTitle(p)}</strong>
+                      <small>{[p.sourceCounty, p.parcelId || p.apn].filter(Boolean).join(" · ")}</small>
                     </span>
                     <Icon name="chevron" size={15} />
                   </button>
                 ))}
               </div>
+              <p className="panel-note">Saved in this browser only.</p>
             </section>
           ) : null}
           <section className="panel-section market-section">

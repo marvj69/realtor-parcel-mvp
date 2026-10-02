@@ -5,14 +5,22 @@ import ParcelInspector from "@/components/ParcelInspector";
 import ParcelExplorer from "@/components/ParcelExplorer";
 import ParcelCompare from "@/components/ParcelCompare";
 import Icon from "@/components/Icon";
+import { readStored, STORAGE_KEYS, writeStored } from "@/lib/browser-prefs";
+import type { SavedProjectsState } from "@/lib/saved-work-client";
 import type { AppPanel, MeasurementMode, MeasurementPoint, MeasurementSummary } from "@/types/measurement";
 import type { OfflineAreaSummary } from "@/types/offline";
-import type { ParcelFeature, ParcelSearchResult } from "@/types/parcel";
+import type { ParcelFeature, ParcelProperties, ParcelSearchResult, SavedParcelSummary } from "@/types/parcel";
+
+const DEFAULT_PROJECT_NAME = "My property research";
+const isString = (value: unknown): value is string => typeof value === "string";
 
 type Props = {
-  recentParcels: ParcelFeature[];
+  saved: SavedProjectsState;
+  recentParcels: ParcelProperties[];
   compareParcels: ParcelFeature[];
-  onRecentSelect: (parcel: ParcelFeature) => void;
+  onRecentSelect: (parcel: ParcelProperties) => void;
+  onRecentClear: () => void;
+  onCompareSelect: (parcel: ParcelFeature) => void;
   onCompareToggle: (parcel: ParcelFeature) => void;
   onCompareRemove: (id: string) => void;
   onFocusParcel: () => void;
@@ -27,7 +35,9 @@ type Props = {
   searchLoading: boolean;
   searchError: string | null;
   onSearchResultClick: (result: ParcelSearchResult) => void;
-  onSavedParcelClick: (result: ParcelSearchResult) => void;
+  onVisibleResultsChange: (results: ParcelSearchResult[]) => void;
+  onFitResults: () => void;
+  onSavedParcelClick: (savedParcel: SavedParcelSummary) => void;
   measurementMode: MeasurementMode;
   measurementPoints: MeasurementPoint[];
   measurementSummary: MeasurementSummary;
@@ -97,8 +107,24 @@ export default function ParcelDetails(props: Props) {
   } = props;
   const [parcelDrafts, setParcelDrafts] = useState<Record<string, { tag: string; note: string }>>({});
   const [expanded, setExpanded] = useState(false);
-  const [projectName, setProjectName] = useState("My property research");
-  const [projectRefreshKey, setProjectRefreshKey] = useState(0);
+  // The last project used is the one-click save target, remembered in this browser. A remembered
+  // name that no longer exists (renamed or deleted elsewhere) falls back to the newest project.
+  const [chosenProject, setChosenProject] = useState<{ name: string; fromStorage: boolean } | null>(() => {
+    const name = readStored<string | null>(STORAGE_KEYS.lastProject, null, isString);
+    return name ? { name, fromStorage: true } : null;
+  });
+  const { projects } = props.saved;
+  const staleChoice =
+    chosenProject?.fromStorage && !props.saved.loading && !projects.some((project) => project.name === chosenProject.name);
+  const projectName = (!staleChoice && chosenProject?.name) || projects[0]?.name || DEFAULT_PROJECT_NAME;
+  const rememberProject = (name: string) => {
+    setChosenProject({ name, fromStorage: false });
+    writeStored(STORAGE_KEYS.lastProject, name);
+  };
+  const setProjectName = (name: string) => {
+    if (projects.some((project) => project.name === name)) rememberProject(name);
+    else setChosenProject({ name, fromStorage: false });
+  };
   const latestSearchSubmitRef = useRef(onSearchSubmit);
   useEffect(() => {
     latestSearchSubmitRef.current = onSearchSubmit;
@@ -162,12 +188,25 @@ export default function ParcelDetails(props: Props) {
                 onSelect={onSearchResultClick}
                 recent={props.recentParcels}
                 onRecentSelect={props.onRecentSelect}
+                onRecentClear={props.onRecentClear}
                 onMarketSelect={props.onMarketSelect}
+                onVisibleResultsChange={props.onVisibleResultsChange}
+                onFitResults={props.onFitResults}
               />
             ) : null}
             {activePanel === "saved" ? (
               <SavedProjectsSidebar
-                refreshKey={projectRefreshKey}
+                saved={props.saved}
+                nextSaveProject={projectName}
+                onProjectRenamed={(from, to) => {
+                  if (from === projectName) rememberProject(to);
+                }}
+                onProjectDeleted={(name) => {
+                  if (name === projectName) {
+                    setChosenProject(null);
+                    writeStored(STORAGE_KEYS.lastProject, null);
+                  }
+                }}
                 activeParcelId={parcel?.properties.id ?? null}
                 onProjectNameSelect={(name) => {
                   setProjectName(name);
@@ -181,11 +220,12 @@ export default function ParcelDetails(props: Props) {
                 <ParcelInspector
                   key={parcel.properties.id}
                   parcel={parcel}
-                  draft={parcelDrafts[parcel.properties.id] || { tag: "lead", note: "" }}
+                  draft={parcelDrafts[parcel.properties.id]}
                   onDraftChange={(draft) => setParcelDrafts((items) => ({ ...items, [parcel.properties.id]: draft }))}
                   projectName={projectName}
                   onProjectNameChange={setProjectName}
-                  onSaved={() => setProjectRefreshKey((key) => key + 1)}
+                  onProjectSaved={rememberProject}
+                  saved={props.saved}
                   onCompare={() => props.onCompareToggle(parcel)}
                   compared={props.compareParcels.some((p) => p.properties.id === parcel.properties.id)}
                   onFocus={props.onFocusParcel}
@@ -206,7 +246,7 @@ export default function ParcelDetails(props: Props) {
               <ParcelCompare
                 parcels={props.compareParcels}
                 onRemove={props.onCompareRemove}
-                onSelect={props.onRecentSelect}
+                onSelect={props.onCompareSelect}
                 onExplore={() => onActivePanelChange("search")}
               />
             ) : null}

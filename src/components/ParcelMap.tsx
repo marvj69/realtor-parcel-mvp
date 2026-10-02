@@ -8,13 +8,18 @@ let maplibregl: typeof MapLibreDefault;
 import {
   area as turfArea,
   bbox as turfBbox,
+  booleanPointInPolygon,
   length as turfLength,
   lineString as turfLineString,
   polygon as turfPolygon
 } from "@turf/turf";
 import type { Feature, FeatureCollection, Geometry, MultiPolygon, Polygon, Position } from "geojson";
-import WorkspaceChrome from "@/components/WorkspaceChrome";
+import WorkspaceChrome, { type WorkspacePopover } from "@/components/WorkspaceChrome";
 import ParcelDetails from "@/components/ParcelDetails";
+import Icon from "@/components/Icon";
+import { readStored, STORAGE_KEYS, writeStored } from "@/lib/browser-prefs";
+import { formatAddress, parcelTitle, tagColor } from "@/lib/parcel-presentation";
+import { useSavedProjects } from "@/lib/saved-work-client";
 import {
   deleteOfflineArea,
   estimateOfflineAreaBytes,
@@ -26,7 +31,13 @@ import {
 } from "@/lib/offline-areas";
 import type { AppPanel, MeasurementMode, MeasurementPoint, MeasurementSummary } from "@/types/measurement";
 import type { OfflineArea, OfflineAreaBbox, OfflineAreaSummary } from "@/types/offline";
-import type { ParcelFeature, ParcelFeatureCollection, ParcelProperties, ParcelSearchResult } from "@/types/parcel";
+import type {
+  ParcelFeature,
+  ParcelFeatureCollection,
+  ParcelProperties,
+  ParcelSearchResult,
+  SavedParcelSummary
+} from "@/types/parcel";
 
 const EMPTY_FEATURE_COLLECTION: FeatureCollection<Polygon | MultiPolygon, ParcelProperties> = {
   type: "FeatureCollection",
@@ -62,6 +73,14 @@ const OFFLINE_PARCEL_SOURCE_ID = "offline-parcels";
 const OFFLINE_PARCEL_FILL_LAYER_ID = "offline-parcel-fill";
 const OFFLINE_PARCEL_LINE_LAYER_ID = "offline-parcel-line";
 const SELECTED_PARCEL_LINE_LAYER_ID = "selected-parcel-line";
+const PARCEL_TILE_HOVER_LAYER_ID = "parcel-tile-hover";
+const PARCEL_GEOJSON_HOVER_LAYER_ID = "parcel-hover";
+const OFFLINE_PARCEL_HOVER_LAYER_ID = "offline-parcel-hover";
+const SAVED_PARCEL_SOURCE_ID = "saved-parcels";
+const SAVED_PARCEL_LAYER_ID = "saved-parcel-points";
+// Bump when tile feature properties change so browsers skip tiles cached with the old schema.
+const PARCEL_TILE_SCHEMA = 2;
+const HOVER_FILTER_NONE: MapLibre.FilterSpecification = ["==", ["get", "id"], ""];
 const MEASUREMENT_SOURCE_ID = "measurements";
 const MEASUREMENT_FILL_LAYER_ID = "measurement-fill";
 const MEASUREMENT_LINE_LAYER_ID = "measurement-line";
@@ -70,6 +89,8 @@ const STREET_PARCEL_LINE_COLOR = "#1d4ed8";
 const SATELLITE_PARCEL_LINE_COLOR = "#ff7a00";
 const STREET_SELECTED_PARCEL_LINE_COLOR = "#ea580c";
 const SATELLITE_SELECTED_PARCEL_LINE_COLOR = "#ff9f1c";
+const STREET_HOVER_LINE_COLOR = "#1e3a8a";
+const SATELLITE_HOVER_LINE_COLOR = "#ffffff";
 const OPENFREEMAP_STYLE_PREFIX = "https://tiles.openfreemap.org/styles/";
 const DEFAULT_STREET_TILE_URL =
   "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}";
@@ -103,6 +124,61 @@ type MeasurementFeatureProperties = {
 };
 
 type BasemapMode = "streets" | "satellite";
+type MapPrefs = {
+  basemap: BasemapMode;
+  boundaries: boolean;
+  labels: boolean;
+  fillOpacity: number;
+  savedLayer: boolean;
+};
+const DEFAULT_MAP_PREFS: MapPrefs = {
+  basemap: "streets",
+  boundaries: true,
+  labels: true,
+  fillOpacity: 8,
+  savedLayer: true
+};
+
+function readMapPrefs(): MapPrefs {
+  const stored = readStored<Partial<MapPrefs>>(
+    STORAGE_KEYS.mapPrefs,
+    {},
+    (value): value is Partial<MapPrefs> => typeof value === "object" && value !== null
+  );
+  return {
+    basemap: stored.basemap === "satellite" ? "satellite" : "streets",
+    boundaries: typeof stored.boundaries === "boolean" ? stored.boundaries : DEFAULT_MAP_PREFS.boundaries,
+    labels: typeof stored.labels === "boolean" ? stored.labels : DEFAULT_MAP_PREFS.labels,
+    fillOpacity:
+      typeof stored.fillOpacity === "number" && stored.fillOpacity >= 0 && stored.fillOpacity <= 50
+        ? stored.fillOpacity
+        : DEFAULT_MAP_PREFS.fillOpacity,
+    savedLayer: typeof stored.savedLayer === "boolean" ? stored.savedLayer : DEFAULT_MAP_PREFS.savedLayer
+  };
+}
+
+const isRecentList = (value: unknown): value is ParcelProperties[] =>
+  Array.isArray(value) && value.every((item) => typeof item?.id === "string");
+
+function syncParcelUrl(parcelId: string | null) {
+  const url = new URL(window.location.href);
+  if (parcelId) url.searchParams.set("parcel", parcelId);
+  else url.searchParams.delete("parcel");
+  if (url.href !== window.location.href) window.history.replaceState(window.history.state, "", url);
+}
+
+function savedParcelCollection(savedParcels: SavedParcelSummary[]) {
+  const byParcel = new Map<string, SavedParcelSummary>();
+  for (const saved of savedParcels) if (saved.center && !byParcel.has(saved.parcel.id)) byParcel.set(saved.parcel.id, saved);
+  return {
+    type: "FeatureCollection" as const,
+    features: [...byParcel.values()].map((saved) => ({
+      type: "Feature" as const,
+      geometry: saved.center!,
+      properties: { id: saved.parcel.id, color: tagColor(saved.tag), title: parcelTitle(saved.parcel) }
+    }))
+  };
+}
 type MapStyleConfig = string | MapLibre.StyleSpecification;
 type LayerVisibility = "visible" | "none";
 type LayerVisibilityById = Record<string, LayerVisibility>;
@@ -139,6 +215,11 @@ function setParcelBoundaryPaint(map: MapLibre.Map, basemapMode: BasemapMode, min
 
   if (map.getLayer(SELECTED_PARCEL_LINE_LAYER_ID)) {
     map.setPaintProperty(SELECTED_PARCEL_LINE_LAYER_ID, "line-color", selectedLineColor);
+  }
+
+  for (const layerId of [PARCEL_TILE_HOVER_LAYER_ID, PARCEL_GEOJSON_HOVER_LAYER_ID]) {
+    if (map.getLayer(layerId))
+      map.setPaintProperty(layerId, "line-color", isSatellite ? SATELLITE_HOVER_LINE_COLOR : STREET_HOVER_LINE_COLOR);
   }
 }
 
@@ -601,6 +682,7 @@ type AuthPayload = {
 type AuthMode = "sign-in" | "create-account";
 
 export default function ParcelMap() {
+  const [initialPrefs] = useState(readMapPrefs);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibre.Map | null>(null);
   const parcelAbortRef = useRef<AbortController | null>(null);
@@ -609,16 +691,20 @@ export default function ParcelMap() {
   const searchAbortRef = useRef<AbortController | null>(null);
   const selectionRequestRef = useRef(0);
   const lookupAbortRef = useRef<AbortController | null>(null);
-  const basemapModeRef = useRef<BasemapMode>("streets");
+  const basemapModeRef = useRef<BasemapMode>(initialPrefs.basemap);
   const satelliteLabelsReadyRef = useRef(false);
   const activePanelRef = useRef<AppPanel>("search");
   const measurementModeRef = useRef<MeasurementMode>("distance");
   const selectedParcelRef = useRef<ParcelFeature | null>(null);
   const offlineFeatureCollectionRef = useRef<ParcelFeatureCollection | null>(null);
   const streetLayerVisibilityRef = useRef<LayerVisibilityById>({});
+  const recentFeaturesRef = useRef(new Map<string, ParcelFeature>());
+  const userLocationMarkerRef = useRef<MapLibre.Marker | null>(null);
+  const hoverTipRef = useRef<HTMLDivElement | null>(null);
+  const openPopoverRef = useRef<WorkspacePopover>(null);
   const [selectedParcel, setSelectedParcel] = useState<ParcelFeature | null>(null);
   const [activePanel, setActivePanel] = useState<AppPanel>("search");
-  const [basemapMode, setBasemapMode] = useState<BasemapMode>("streets");
+  const [basemapMode, setBasemapMode] = useState<BasemapMode>(initialPrefs.basemap);
   const [measurementMode, setMeasurementMode] = useState<MeasurementMode>("distance");
   const [measurementPoints, setMeasurementPoints] = useState<MeasurementPoint[]>([]);
   const [statusMessage, setStatusMessage] = useState("Zoom in to view parcels.");
@@ -646,12 +732,24 @@ export default function ParcelMap() {
   const [offlineError, setOfflineError] = useState<string | null>(null);
   const [activeOfflineAreaId, setActiveOfflineAreaId] = useState<string | null>(null);
 
-  const [recentParcels, setRecentParcels] = useState<ParcelFeature[]>([]);
+  const [recentParcels, setRecentParcels] = useState<ParcelProperties[]>(() =>
+    readStored(STORAGE_KEYS.recentParcels, [], isRecentList)
+  );
   const [compareParcels, setCompareParcels] = useState<ParcelFeature[]>([]);
-  const [boundaries, setBoundaries] = useState(true);
-  const [labels, setLabels] = useState(true);
-  const [fillOpacity, setFillOpacity] = useState(8);
-  const overlayPreferencesRef = useRef({ boundaries: true, labels: true, fillOpacity: 8 });
+  const [boundaries, setBoundaries] = useState(initialPrefs.boundaries);
+  const [labels, setLabels] = useState(initialPrefs.labels);
+  const [fillOpacity, setFillOpacity] = useState(initialPrefs.fillOpacity);
+  const [savedLayer, setSavedLayer] = useState(initialPrefs.savedLayer);
+  const overlayPreferencesRef = useRef({
+    boundaries: initialPrefs.boundaries,
+    labels: initialPrefs.labels,
+    fillOpacity: initialPrefs.fillOpacity
+  });
+  const [openPopover, setOpenPopover] = useState<WorkspacePopover>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const [belowParcelZoom, setBelowParcelZoom] = useState(false);
+  const [pinnedResults, setPinnedResults] = useState<ParcelSearchResult[]>([]);
+  const [locating, setLocating] = useState(false);
   const [online, setOnline] = useState(true);
   const [coordinate, setCoordinate] = useState("47.12110° N · 88.56900° W");
   const [toast, setToast] = useState("");
@@ -669,17 +767,22 @@ export default function ParcelMap() {
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement ||
         event.target instanceof HTMLSelectElement ||
-        (event.target instanceof HTMLElement && event.target.isContentEditable)
+        (event.target instanceof HTMLElement && event.target.isContentEditable) ||
+        document.querySelector("dialog[open]")
       )
         return;
       if (event.key === "/") {
         event.preventDefault();
-        setActivePanel("search");
-        setTimeout(() => document.getElementById("parcel-search")?.focus(), 40);
+        focusSearch();
       }
       if (event.key.toLowerCase() === "m") setActivePanel("measure");
       if (event.key.toLowerCase() === "s") setActivePanel("saved");
-      if (event.key === "Escape") setActivePanel("map");
+      // Escape backs out one level: popover, then panel, then the selected parcel.
+      if (event.key === "Escape") {
+        if (openPopoverRef.current) setOpenPopover(null);
+        else if (activePanelRef.current !== "map") setActivePanel("map");
+        else if (selectedParcelRef.current) clearSelection();
+      }
     };
     window.addEventListener("keydown", keyboard);
     return () => {
@@ -687,13 +790,37 @@ export default function ParcelMap() {
       window.removeEventListener("offline", update);
       window.removeEventListener("keydown", keyboard);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers call helpers that only use refs and setters
   }, []);
 
   useEffect(() => {
     if (!toast) return;
-    const timeout = setTimeout(() => setToast(""), 4500);
+    const timeout = setTimeout(() => setToast(""), Math.max(4500, toast.length * 55));
     return () => clearTimeout(timeout);
   }, [toast]);
+
+  useEffect(() => {
+    openPopoverRef.current = openPopover;
+  }, [openPopover]);
+
+  useEffect(() => {
+    writeStored(STORAGE_KEYS.mapPrefs, { basemap: basemapMode, boundaries, labels, fillOpacity, savedLayer });
+  }, [basemapMode, boundaries, labels, fillOpacity, savedLayer]);
+
+  useEffect(() => {
+    writeStored(STORAGE_KEYS.recentParcels, recentParcels);
+  }, [recentParcels]);
+
+  const savedProjects = useSavedProjects(!authLoading && Boolean(authData?.authenticated));
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map) return;
+    const source = map.getSource(SAVED_PARCEL_SOURCE_ID) as MapLibre.GeoJSONSource | undefined;
+    source?.setData(savedParcelCollection(savedProjects.projects.flatMap((project) => project.savedParcels)));
+    if (map.getLayer(SAVED_PARCEL_LAYER_ID))
+      map.setLayoutProperty(SAVED_PARCEL_LAYER_ID, "visibility", savedLayer ? "visible" : "none");
+  }, [mapReady, savedProjects.projects, savedLayer]);
 
   function applyOverlayPreferences(map: MapLibre.Map) {
     const prefs = overlayPreferencesRef.current;
@@ -731,16 +858,90 @@ export default function ParcelMap() {
     if (boundariesChanged) parcelRefreshRef.current?.();
   }, [boundaries, labels, fillOpacity]);
 
-  function selectRecentParcel(parcel: ParcelFeature) {
+  function focusSearch() {
+    const header = document.getElementById("header-search-input");
+    if (header && header.offsetParent !== null) {
+      header.focus();
+      return;
+    }
+    setActivePanel("search");
+    setTimeout(() => document.getElementById("parcel-search")?.focus(), 40);
+  }
+
+  function showSelectedParcel(nextParcel: ParcelFeature | null, focus = true) {
+    setSelectedParcelState(nextParcel);
+    if (nextParcel) setActivePanel("details");
+    const map = mapRef.current;
+    if (!map) return;
+    setGeoJsonSourceData(
+      map,
+      "selected-parcel",
+      nextParcel ? { type: "FeatureCollection", features: [nextParcel] } : EMPTY_FEATURE_COLLECTION
+    );
+    if (nextParcel && focus) focusMapOnSelectedParcel(map, nextParcel);
+  }
+
+  function clearSelection(message = "Selection cleared.") {
     selectionRequestRef.current += 1;
     lookupAbortRef.current?.abort();
-    setSelectedParcelState(parcel);
-    setActivePanel("details");
-    const map = mapRef.current;
-    if (map) {
-      setGeoJsonSourceData(map, "selected-parcel", { type: "FeatureCollection", features: [parcel] });
-      focusMapOnSelectedParcel(map, parcel);
+    showSelectedParcel(null);
+    if (activePanelRef.current === "details") setActivePanel("map");
+    setStatusMessage(message);
+  }
+
+  function selectParcelFeature(parcel: ParcelFeature) {
+    selectionRequestRef.current += 1;
+    lookupAbortRef.current?.abort();
+    showSelectedParcel(parcel);
+  }
+
+  async function fetchParcel(query: string, signal: AbortSignal) {
+    const response = await fetch(`/api/parcels/lookup?${query}`, { signal });
+    const payload = (await response.json()) as { ok?: boolean; data?: ParcelFeature | null; error?: string };
+    if (!response.ok || !payload.ok) throw new Error(payload.error ?? "Unable to look up parcel");
+    return payload.data ?? null;
+  }
+
+  /** Runs one lookup at a time; a newer selection cancels an older one. Returns null when superseded. */
+  async function runSelection(lookup: (signal: AbortSignal) => Promise<ParcelFeature | null>) {
+    const requestId = ++selectionRequestRef.current;
+    lookupAbortRef.current?.abort();
+    const controller = new AbortController();
+    lookupAbortRef.current = controller;
+    setError(null);
+    try {
+      const parcel = await lookup(controller.signal);
+      return selectionRequestRef.current === requestId ? { parcel } : null;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return null;
+      if (selectionRequestRef.current === requestId)
+        setError(err instanceof Error ? err.message : "Unable to look up parcel");
+      return null;
     }
+  }
+
+  async function selectParcelAtPoint(lng: number, lat: number) {
+    const result = await runSelection((signal) => fetchParcel(`lng=${lng}&lat=${lat}`, signal));
+    if (result?.parcel) showSelectedParcel(result.parcel);
+    return result;
+  }
+
+  // IDs avoid picking an overlapping polygon from another source at the same point.
+  async function selectParcelById(id: string, fallbackCenter?: [number, number]) {
+    const offline = findCachedParcel(offlineFeatureCollectionRef.current, id);
+    const cached = recentFeaturesRef.current.get(id) ?? (!navigator.onLine ? offline : null);
+    if (cached) {
+      selectParcelFeature(cached);
+      return;
+    }
+    const result = await runSelection(async (signal) => {
+      const parcel = await fetchParcel(`id=${encodeURIComponent(id)}`, signal);
+      if (parcel || !fallbackCenter) return parcel;
+      return fetchParcel(`lng=${fallbackCenter[0]}&lat=${fallbackCenter[1]}`, signal);
+    });
+    if (!result) return;
+    if (result.parcel) showSelectedParcel(result.parcel);
+    else setToast("That parcel isn't in the current parcel dataset.");
   }
 
   function toggleComparison(parcel: ParcelFeature) {
@@ -767,7 +968,11 @@ export default function ParcelMap() {
   async function copyMapLink() {
     try {
       await navigator.clipboard.writeText(window.location.href);
-      setToast("Map link copied. Recipients need their own workspace access.");
+      setToast(
+        selectedParcelRef.current
+          ? "Link copied with the selected parcel. Recipients need their own workspace access."
+          : "Map link copied. Recipients need their own workspace access."
+      );
     } catch {
       setToast("Copy unavailable. Copy the map URL from your address bar.");
     }
@@ -792,6 +997,90 @@ export default function ParcelMap() {
     }
   }
 
+  function centerOf(point: { coordinates: number[] } | null): [number, number] | undefined {
+    return point ? [point.coordinates[0], point.coordinates[1]] : undefined;
+  }
+
+  function fitPinnedResults() {
+    const map = mapRef.current;
+    const points = pinnedResults.flatMap((result) => (result.center ? [result.center.coordinates] : []));
+    if (!map || !points.length) return;
+    if (points.length === 1) {
+      map.flyTo({ center: [points[0][0], points[0][1]], zoom: Math.max(map.getZoom(), 16), duration: 800 });
+      return;
+    }
+    const lngs = points.map((point) => point[0]);
+    const lats = points.map((point) => point[1]);
+    map.fitBounds(
+      [
+        [Math.min(...lngs), Math.min(...lats)],
+        [Math.max(...lngs), Math.max(...lats)]
+      ],
+      { padding: getSelectedParcelCameraPadding(map), maxZoom: 16, duration: 800 }
+    );
+  }
+
+  function zoomToParcels() {
+    mapRef.current?.easeTo({ zoom: getParcelLayerConfig().minZoom + 1, duration: 700 });
+  }
+
+  function locateParcel() {
+    if (!("geolocation" in navigator)) {
+      setToast("Location isn't available in this browser.");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        setLocating(false);
+        const map = mapRef.current;
+        if (!map) return;
+        const { longitude: lng, latitude: lat, accuracy } = position.coords;
+        userLocationMarkerRef.current?.remove();
+        const dot = document.createElement("div");
+        dot.className = "user-location-dot";
+        userLocationMarkerRef.current = new maplibregl.Marker({ element: dot }).setLngLat([lng, lat]).addTo(map);
+        const precision = `Located within about ${Math.round(accuracy).toLocaleString()} m.`;
+        const caution =
+          accuracy > 50
+            ? " Accuracy is low, so this may be a neighboring parcel."
+            : " Confirm the highlighted boundary — GPS and parcel lines are both approximate.";
+
+        if (!navigator.onLine) {
+          const offline = offlineFeatureCollectionRef.current?.features.find((feature) =>
+            booleanPointInPolygon([lng, lat], feature)
+          );
+          if (offline) {
+            selectParcelFeature(offline);
+            setToast(`${precision} Showing the downloaded parcel at your location.${caution}`);
+          } else {
+            map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 16), duration: 900 });
+            setToast(`${precision} You're offline and no downloaded area covers this spot.`);
+          }
+          return;
+        }
+
+        const result = await selectParcelAtPoint(lng, lat);
+        if (!result) return;
+        if (result.parcel) {
+          setToast(`${precision}${caution}`);
+        } else {
+          map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 16), duration: 900 });
+          setToast(`${precision} No parcel record was found at your location.`);
+        }
+      },
+      (err) => {
+        setLocating(false);
+        setToast(
+          err.code === err.PERMISSION_DENIED
+            ? "Location permission is off. Allow location access for this site in your browser settings."
+            : "Couldn't get your location. Try again in a moment."
+        );
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+    );
+  }
+
   function goToMarket(center: [number, number]) {
     mapRef.current?.flyTo({ center, zoom: 14, pitch: 0, bearing: 0, duration: 1100 });
   }
@@ -799,10 +1088,13 @@ export default function ParcelMap() {
   function setSelectedParcelState(nextParcel: ParcelFeature | null) {
     selectedParcelRef.current = nextParcel;
     setSelectedParcel(nextParcel);
-    if (nextParcel)
+    syncParcelUrl(nextParcel?.properties.id ?? null);
+    if (nextParcel) {
+      recentFeaturesRef.current.set(nextParcel.properties.id, nextParcel);
       setRecentParcels((items) =>
-        [nextParcel, ...items.filter((p) => p.properties.id !== nextParcel.properties.id)].slice(0, 8)
+        [nextParcel.properties, ...items.filter((p) => p.id !== nextParcel.properties.id)].slice(0, 8)
       );
+    }
   }
 
   async function refreshOfflineAreas() {
@@ -1191,50 +1483,66 @@ export default function ParcelMap() {
     }
     parcelRefreshRef.current = queueVisibleParcelLoad;
 
-    function setSelectedParcelFeature(nextParcel: ParcelFeature | null) {
-      setSelectedParcelState(nextParcel);
-      if (nextParcel) setActivePanel("details");
-      setGeoJsonSourceData(
-        map,
-        "selected-parcel",
-        nextParcel
-          ? {
-              type: "FeatureCollection",
-              features: [nextParcel]
-            }
-          : EMPTY_FEATURE_COLLECTION
-      );
-      if (nextParcel) focusMapOnSelectedParcel(map, nextParcel);
+    // Hover feedback: outline the parcel under the pointer and label it near the cursor.
+    let hoveredParcelId: string | null = null;
+    let hoverFrame = 0;
+    function setHoveredParcel(id: string | null) {
+      if (id === hoveredParcelId) return;
+      hoveredParcelId = id;
+      const filter: MapLibre.FilterSpecification = id ? ["==", ["get", "id"], id] : HOVER_FILTER_NONE;
+      for (const layerId of [PARCEL_TILE_HOVER_LAYER_ID, PARCEL_GEOJSON_HOVER_LAYER_ID, OFFLINE_PARCEL_HOVER_LAYER_ID])
+        if (map.getLayer(layerId)) map.setFilter(layerId, filter);
     }
-
-    async function selectParcelAt(lng: number, lat: number) {
-      const requestId = ++selectionRequestRef.current;
-      lookupAbortRef.current?.abort();
-      const controller = new AbortController();
-      lookupAbortRef.current = controller;
-      setError(null);
-      try {
-        const response = await fetch(`/api/parcels/lookup?lng=${lng}&lat=${lat}`, { signal: controller.signal });
-        const payload = (await response.json()) as { ok?: boolean; data?: ParcelFeature | null; error?: string };
-
-        if (!response.ok || !payload.ok) {
-          throw new Error(payload.error ?? "Unable to look up parcel");
-        }
-
-        if (selectionRequestRef.current !== requestId) return;
-        const nextParcel = payload.data ?? null;
-        if (nextParcel && nextParcel.properties.id === selectedParcelRef.current?.properties.id) {
-          setSelectedParcelFeature(null);
-          setStatusMessage("Parcel unselected.");
-          return;
-        }
-
-        setSelectedParcelFeature(nextParcel);
-      } catch (err) {
-        if (selectionRequestRef.current !== requestId) return;
-        setError(err instanceof Error ? err.message : "Unable to look up parcel");
+    function clearHover() {
+      cancelAnimationFrame(hoverFrame);
+      setHoveredParcel(null);
+      if (hoverTipRef.current) hoverTipRef.current.hidden = true;
+      if (activePanelRef.current !== "measure") map.getCanvas().style.cursor = "";
+    }
+    function isVisibleLayer(layerId: string) {
+      return Boolean(map.getLayer(layerId)) && map.getLayoutProperty(layerId, "visibility") !== "none";
+    }
+    function hoverAt(point: MapLibre.Point) {
+      if (activePanelRef.current === "measure") {
+        clearHover();
+        return;
       }
+      const layers = [
+        SAVED_PARCEL_LAYER_ID,
+        OFFLINE_PARCEL_FILL_LAYER_ID,
+        PARCEL_TILE_FILL_LAYER_ID,
+        PARCEL_GEOJSON_FILL_LAYER_ID
+      ].filter(isVisibleLayer);
+      const feature = layers.length ? map.queryRenderedFeatures(point, { layers })[0] : undefined;
+      const props = feature?.properties ?? {};
+      if (!feature || typeof props.id !== "string") {
+        clearHover();
+        return;
+      }
+      setHoveredParcel(props.id);
+      map.getCanvas().style.cursor = "pointer";
+      const tip = hoverTipRef.current;
+      if (!tip) return;
+      const label =
+        feature.layer.id === SAVED_PARCEL_LAYER_ID
+          ? `Saved · ${props.title}`
+          : formatAddress(props.site_address ?? props.siteAddress) ||
+            props.parcel_id ||
+            props.parcelId ||
+            props.apn ||
+            "Parcel";
+      tip.textContent = props.id === selectedParcelRef.current?.properties.id ? `${label} (selected)` : label;
+      tip.hidden = false;
+      tip.style.transform = `translate(${Math.round(point.x + 14)}px, ${Math.round(point.y + 16)}px)`;
     }
+    map.on("mousemove", (event) => {
+      cancelAnimationFrame(hoverFrame);
+      hoverFrame = requestAnimationFrame(() => hoverAt(event.point));
+    });
+    map.on("mouseout", clearHover);
+    map.on("movestart", () => {
+      if (hoverTipRef.current) hoverTipRef.current.hidden = true;
+    });
 
     // `load` waits for visible raster tiles. Install independent sources as soon
     // as the style exists so a slow topo provider cannot block satellite/parcels.
@@ -1355,7 +1663,7 @@ export default function ParcelMap() {
         map.addSource(PARCEL_TILE_SOURCE_ID, {
           type: "vector",
           tiles: [
-            `${window.location.origin}/api/parcels/tiles/{z}/{x}/{y}?v=${process.env.NEXT_PUBLIC_PARCEL_DATASET_VERSION}`
+            `${window.location.origin}/api/parcels/tiles/{z}/{x}/{y}?v=${process.env.NEXT_PUBLIC_PARCEL_DATASET_VERSION}&schema=${PARCEL_TILE_SCHEMA}`
           ],
           minzoom: parcelLayerConfig.minZoom,
           maxzoom: 18
@@ -1384,6 +1692,16 @@ export default function ParcelMap() {
             "line-opacity": getStreetParcelTileLineOpacity(parcelLayerConfig.minZoom),
             "line-width": ["interpolate", ["linear"], ["zoom"], parcelLayerConfig.minZoom, 0.55, 17, 1.25]
           }
+        });
+
+        map.addLayer({
+          id: PARCEL_TILE_HOVER_LAYER_ID,
+          type: "line",
+          source: PARCEL_TILE_SOURCE_ID,
+          "source-layer": PARCEL_TILE_SOURCE_LAYER,
+          minzoom: parcelLayerConfig.minZoom,
+          filter: HOVER_FILTER_NONE,
+          paint: { "line-color": STREET_HOVER_LINE_COLOR, "line-width": 2.5 }
         });
       }
 
@@ -1419,6 +1737,14 @@ export default function ParcelMap() {
         }
       });
 
+      map.addLayer({
+        id: PARCEL_GEOJSON_HOVER_LAYER_ID,
+        type: "line",
+        source: "parcels",
+        filter: HOVER_FILTER_NONE,
+        paint: { "line-color": STREET_HOVER_LINE_COLOR, "line-width": 2.5 }
+      });
+
       map.addSource(OFFLINE_PARCEL_SOURCE_ID, {
         type: "geojson",
         data: EMPTY_FEATURE_COLLECTION
@@ -1446,6 +1772,14 @@ export default function ParcelMap() {
       });
 
       map.addLayer({
+        id: OFFLINE_PARCEL_HOVER_LAYER_ID,
+        type: "line",
+        source: OFFLINE_PARCEL_SOURCE_ID,
+        filter: HOVER_FILTER_NONE,
+        paint: { "line-color": "#064e3b", "line-width": 2.5 }
+      });
+
+      map.addLayer({
         id: "selected-parcel-fill",
         type: "fill",
         source: "selected-parcel",
@@ -1462,6 +1796,20 @@ export default function ParcelMap() {
         paint: {
           "line-color": STREET_SELECTED_PARCEL_LINE_COLOR,
           "line-width": 3
+        }
+      });
+
+      // Saved parcels stay visible at every zoom so the pipeline reads at county scale.
+      map.addSource(SAVED_PARCEL_SOURCE_ID, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      map.addLayer({
+        id: SAVED_PARCEL_LAYER_ID,
+        type: "circle",
+        source: SAVED_PARCEL_SOURCE_ID,
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 4.5, 14, 6.5, 18, 8],
+          "circle-color": ["get", "color"],
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 2
         }
       });
 
@@ -1509,6 +1857,8 @@ export default function ParcelMap() {
       applyBasemapMode(map, basemapModeRef.current, streetLayerVisibilityRef.current, parcelLayerConfig.minZoom);
       applyOverlayPreferences(map);
       queueVisibleParcelLoad(0);
+      setBelowParcelZoom(map.getZoom() < parcelLayerConfig.minZoom);
+      setMapReady(true);
     });
 
     map.on("sourcedata", event => {
@@ -1538,6 +1888,7 @@ export default function ParcelMap() {
           center.lng >= 0 ? "E" : "W"
         } · z${map.getZoom().toFixed(1)}`
       );
+      setBelowParcelZoom(map.getZoom() < parcelLayerConfig.minZoom);
       queueVisibleParcelLoad();
     });
 
@@ -1547,6 +1898,16 @@ export default function ParcelMap() {
         return;
       }
 
+      const selectedId = selectedParcelRef.current?.properties.id;
+      if (isVisibleLayer(SAVED_PARCEL_LAYER_ID)) {
+        const savedId = map.queryRenderedFeatures(event.point, { layers: [SAVED_PARCEL_LAYER_ID] })[0]?.properties?.id;
+        if (typeof savedId === "string") {
+          if (savedId === selectedId) setActivePanel("details");
+          else void selectParcelById(savedId);
+          return;
+        }
+      }
+
       if (map.getZoom() < parcelLayerConfig.minZoom) {
         setStatusMessage("Zoom in until parcel outlines are visible before selecting a parcel.");
         return;
@@ -1554,28 +1915,29 @@ export default function ParcelMap() {
 
       const clickedParcel = getSelectableParcelAtPoint(map, event.point);
       if (!clickedParcel.hasFeature) {
-        setStatusMessage("Click a visible parcel outline to select it.");
+        if (selectedId) clearSelection();
+        else setStatusMessage("Click a visible parcel outline to select it.");
         return;
       }
 
-      selectionRequestRef.current += 1;
-      lookupAbortRef.current?.abort();
-      if (clickedParcel.parcelId && clickedParcel.parcelId === selectedParcelRef.current?.properties.id) {
-        setSelectedParcelFeature(null);
-        setStatusMessage("Parcel unselected.");
+      // Clicking the selected parcel brings its details back instead of unselecting it.
+      if (clickedParcel.parcelId && clickedParcel.parcelId === selectedId) {
+        setActivePanel("details");
+        setStatusMessage("Press Esc or click an empty spot to clear the selection.");
         return;
       }
 
       if (clickedParcel.source === "offline") {
         const cachedParcel = findCachedParcel(offlineFeatureCollectionRef.current, clickedParcel.parcelId);
         if (cachedParcel) {
-          setSelectedParcelFeature(cachedParcel);
+          selectParcelFeature(cachedParcel);
           setStatusMessage("Selected parcel from a downloaded browser area.");
           return;
         }
       }
 
-      await selectParcelAt(event.lngLat.lng, event.lngLat.lat);
+      const result = await selectParcelAtPoint(event.lngLat.lng, event.lngLat.lat);
+      if (result && !result.parcel) setStatusMessage("No parcel record was found at that spot.");
     });
 
     return () => {
@@ -1584,12 +1946,17 @@ export default function ParcelMap() {
       resizeObserver.disconnect();
       searchAbortRef.current?.abort();
       lookupAbortRef.current?.abort();
+      cancelAnimationFrame(hoverFrame);
+      userLocationMarkerRef.current?.remove();
       map.remove();
       mapRef.current = null;
+      setMapReady(false);
       parcelRefreshRef.current = null;
       satelliteLabelsReadyRef.current = false;
       streetLayerVisibilityRef.current = {};
     };
+    // The map is created once; its handlers call selection helpers that only use refs and setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authData?.authenticated, authData?.vectorTilesAvailable, authLoading, mapLibraryReady]);
 
   async function login(event: FormEvent<HTMLFormElement>) {
@@ -1685,40 +2052,45 @@ export default function ParcelMap() {
     }
   }
 
-  async function selectSearchResult(result: ParcelSearchResult) {
-    if (!result.center) return;
-    const requestId = ++selectionRequestRef.current;
-    lookupAbortRef.current?.abort();
-    const controller = new AbortController();
-    lookupAbortRef.current = controller;
-    setError(null);
-    const [lng, lat] = result.center.coordinates;
-    const map = mapRef.current;
-
-    try {
-      const response = await fetch(`/api/parcels/lookup?lng=${lng}&lat=${lat}`, { signal: controller.signal });
-      const payload = (await response.json()) as { ok?: boolean; data?: ParcelFeature | null; error?: string };
-      if (!response.ok || !payload.ok) throw new Error(payload.error ?? "Unable to load selected parcel");
-
-      if (selectionRequestRef.current !== requestId) return;
-      const nextParcel = payload.data ?? null;
-      setSelectedParcelState(nextParcel);
-      if (nextParcel) setActivePanel("details");
-      const selectedSource = map?.getSource("selected-parcel") as MapLibre.GeoJSONSource | undefined;
-      selectedSource?.setData(
-        nextParcel
-          ? {
-              type: "FeatureCollection",
-              features: [nextParcel]
-            }
-          : EMPTY_FEATURE_COLLECTION
-      );
-      if (map && nextParcel) focusMapOnSelectedParcel(map, nextParcel);
-    } catch (err) {
-      if (selectionRequestRef.current !== requestId) return;
-      setError(err instanceof Error ? err.message : "Unable to load selected parcel");
-    }
+  function selectSearchResult(result: ParcelSearchResult) {
+    void selectParcelById(result.id, centerOf(result.center));
   }
+
+  // Numbered pins for the results listed in Explore, shown while that panel is open.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map || activePanel !== "search") return;
+    const markers = pinnedResults.flatMap((result, index) => {
+      if (!result.center) return [];
+      const element = document.createElement("button");
+      element.type = "button";
+      element.className = "result-pin";
+      element.textContent = String(index + 1);
+      element.title = parcelTitle(result);
+      element.setAttribute("aria-label", `Result ${index + 1}: ${parcelTitle(result)}`);
+      element.addEventListener("click", (event) => {
+        event.stopPropagation();
+        selectSearchResult(result);
+      });
+      return [new maplibregl.Marker({ element }).setLngLat(centerOf(result.center)!)];
+    });
+    // Add in reverse so lower numbers draw on top where pins overlap.
+    for (const marker of [...markers].reverse()) marker.addTo(map);
+    return () => {
+      for (const marker of markers) marker.remove();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- selection helpers only use refs and setters
+  }, [mapReady, pinnedResults, activePanel]);
+
+  // A shared link (?parcel=<id>) opens with that parcel selected.
+  const initialParcelHandledRef = useRef(false);
+  useEffect(() => {
+    if (!mapReady || initialParcelHandledRef.current) return;
+    initialParcelHandledRef.current = true;
+    const parcelId = new URL(window.location.href).searchParams.get("parcel");
+    if (parcelId) void selectParcelById(parcelId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once when the map is ready
+  }, [mapReady]);
 
   if (authLoading) {
     return (
@@ -1864,6 +2236,13 @@ export default function ParcelMap() {
     <div className={`map-layout workspace-layout ${activePanel === "map" ? "panel-collapsed" : "panel-open"}`}>
       <div className="map-wrap">
         <div ref={mapContainerRef} className="map-canvas" />
+        <div ref={hoverTipRef} className="map-hover-tip" hidden aria-hidden="true" />
+        {belowParcelZoom && boundaries && activePanel !== "measure" && !(activePanel === "search" && pinnedResults.length) ? (
+          <button type="button" className="zoom-hint" onClick={zoomToParcels}>
+            <Icon name="zoomIn" size={17} />
+            Zoom in to see parcel boundaries
+          </button>
+        ) : null}
       </div>
       <WorkspaceChrome
         panel={activePanel}
@@ -1876,6 +2255,21 @@ export default function ParcelMap() {
         onLabels={setLabels}
         opacity={fillOpacity}
         onOpacity={setFillOpacity}
+        savedLayer={savedLayer}
+        onSavedLayer={setSavedLayer}
+        savedCount={new Set(savedProjects.projects.flatMap((project) => project.savedParcels.map((s) => s.parcel.id))).size}
+        openPopover={openPopover}
+        onPopoverChange={setOpenPopover}
+        searchQuery={searchQuery}
+        onSearchQueryChange={changeSearchQuery}
+        onSearchSubmit={() => void runSearch()}
+        searchResults={searchResults}
+        searchLoading={searchLoading}
+        searchError={searchError}
+        onSearchResultSelect={selectSearchResult}
+        onSearchSeeAll={() => setActivePanel("search")}
+        onLocate={locateParcel}
+        locating={locating}
         compareCount={compareParcels.length}
         online={online}
         onHome={() => goToMarket(getMapConfig().center)}
@@ -1893,9 +2287,15 @@ export default function ParcelMap() {
         activePanel={activePanel}
         onActivePanelChange={setActivePanel}
         parcel={selectedParcel}
+        saved={savedProjects}
         recentParcels={recentParcels}
         compareParcels={compareParcels}
-        onRecentSelect={selectRecentParcel}
+        onRecentSelect={(parcel) => void selectParcelById(parcel.id)}
+        onRecentClear={() => {
+          recentFeaturesRef.current.clear();
+          setRecentParcels([]);
+        }}
+        onCompareSelect={selectParcelFeature}
         onCompareToggle={toggleComparison}
         onCompareRemove={(id) => setCompareParcels((items) => items.filter((p) => p.properties.id !== id))}
         onMarketSelect={goToMarket}
@@ -1909,7 +2309,9 @@ export default function ParcelMap() {
         searchLoading={searchLoading}
         searchError={searchError}
         onSearchResultClick={selectSearchResult}
-        onSavedParcelClick={selectSearchResult}
+        onVisibleResultsChange={setPinnedResults}
+        onFitResults={fitPinnedResults}
+        onSavedParcelClick={(savedParcel) => void selectParcelById(savedParcel.parcel.id, centerOf(savedParcel.center))}
         measurementMode={measurementMode}
         measurementPoints={measurementPoints}
         measurementSummary={getMeasurementSummary(measurementMode, measurementPoints)}

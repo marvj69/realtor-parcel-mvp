@@ -1,8 +1,19 @@
 "use client";
 import { useState } from "react";
 import Icon, { type IconName } from "@/components/Icon";
-import { PARCEL_DISCLAIMER } from "@/lib/parcel-presentation";
+import {
+  matchKindLabel,
+  PARCEL_DISCLAIMER,
+  PARCEL_DISCLAIMER_SHORT,
+  PARCEL_TAGS,
+  parcelTitle,
+  TAG_COLORS,
+  tagLabel
+} from "@/lib/parcel-presentation";
 import type { AppPanel } from "@/types/measurement";
+import type { ParcelSearchResult } from "@/types/parcel";
+
+export type WorkspacePopover = "layers" | "help" | null;
 
 const NAV: [AppPanel, string, IconName][] = [
   ["search", "Explore", "search"],
@@ -12,6 +23,8 @@ const NAV: [AppPanel, string, IconName][] = [
   ["measure", "Measure", "ruler"],
   ["offline", "Offline", "download"]
 ];
+const TYPEAHEAD_LIMIT = 6;
+
 type Props = {
   panel: AppPanel;
   onPanel: (panel: AppPanel) => void;
@@ -23,6 +36,21 @@ type Props = {
   onLabels: (show: boolean) => void;
   opacity: number;
   onOpacity: (value: number) => void;
+  savedLayer: boolean;
+  onSavedLayer: (show: boolean) => void;
+  savedCount: number;
+  openPopover: WorkspacePopover;
+  onPopoverChange: (popover: WorkspacePopover) => void;
+  searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
+  onSearchSubmit: () => void;
+  searchResults: ParcelSearchResult[];
+  searchLoading: boolean;
+  searchError: string | null;
+  onSearchResultSelect: (result: ParcelSearchResult) => void;
+  onSearchSeeAll: () => void;
+  onLocate: () => void;
+  locating: boolean;
   compareCount: number;
   online: boolean;
   onHome: () => void;
@@ -37,10 +65,151 @@ type Props = {
   toast: string;
 };
 
+function HeaderSearch(p: Props) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const query = p.searchQuery;
+  const top = p.searchResults.filter((result) => result.center).slice(0, TYPEAHEAD_LIMIT);
+  const showList = open && query.trim().length >= 2;
+  const status = p.searchLoading
+    ? "Searching records…"
+    : top.length
+    ? null
+    : query.trim().length < 3
+    ? "Keep typing, or press Enter to search."
+    : p.searchError || "No parcel matches yet.";
+
+  function choose(result: ParcelSearchResult) {
+    p.onSearchResultSelect(result);
+    setOpen(false);
+    setActive(-1);
+    (document.activeElement as HTMLElement | null)?.blur();
+  }
+
+  function seeAll() {
+    if (!p.searchResults.length) p.onSearchSubmit();
+    p.onSearchSeeAll();
+    setOpen(false);
+  }
+
+  return (
+    <div
+      className="header-typeahead"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
+      }}
+    >
+      <Icon name="search" size={16} />
+      <label className="sr-only" htmlFor="header-search-input">
+        Find a property by address, owner, or parcel ID
+      </label>
+      <input
+        id="header-search-input"
+        role="combobox"
+        aria-expanded={showList}
+        aria-controls="header-search-results"
+        aria-autocomplete="list"
+        aria-activedescendant={showList && active >= 0 ? `header-result-${active}` : undefined}
+        autoComplete="off"
+        maxLength={120}
+        placeholder="Find a property"
+        value={query}
+        onFocus={() => setOpen(true)}
+        onChange={(event) => {
+          p.onSearchQueryChange(event.target.value);
+          setOpen(true);
+          setActive(-1);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setOpen(true);
+            setActive((index) => Math.min(index + 1, top.length - 1));
+          } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            setActive((index) => Math.max(index - 1, -1));
+          } else if (event.key === "Enter") {
+            event.preventDefault();
+            if (active >= 0 && top[active]) choose(top[active]);
+            else if (query.trim().length >= 2) seeAll();
+          } else if (event.key === "Escape") {
+            event.stopPropagation();
+            if (showList) setOpen(false);
+            else event.currentTarget.blur();
+          }
+        }}
+      />
+      {query ? (
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Clear search"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            p.onSearchQueryChange("");
+            setActive(-1);
+          }}
+        >
+          <Icon name="close" size={14} />
+        </button>
+      ) : (
+        <kbd>/</kbd>
+      )}
+      {showList ? (
+        <div className="typeahead-panel">
+          {top.length ? (
+            <ul id="header-search-results" role="listbox" aria-label="Matching parcels">
+              {top.map((result, index) => {
+                const match = matchKindLabel(result.matchKind);
+                return (
+                  <li
+                    key={result.id}
+                    id={`header-result-${index}`}
+                    role="option"
+                    aria-selected={index === active}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onMouseEnter={() => setActive(index)}
+                    onClick={() => choose(result)}
+                  >
+                    <strong>{parcelTitle(result)}</strong>
+                    <span>{[result.ownerName, result.sourceCounty].filter(Boolean).join(" · ") || "Owner unavailable"}</span>
+                    {match ? <em>{match}</em> : null}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p id="header-search-results" className="typeahead-status" role="status">
+              {status}
+            </p>
+          )}
+          {p.searchResults.length > 0 || query.trim().length >= 2 ? (
+            <button
+              type="button"
+              className="typeahead-all"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={seeAll}
+            >
+              {p.searchResults.length === 1
+                ? "Open in Explore with filters"
+                : p.searchResults.length
+                ? `See all ${p.searchResults.length} results with filters`
+                : "Open search with filters"}
+              <Icon name="arrow" size={15} />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function WorkspaceChrome(p: Props) {
-  const [layersOpen, setLayersOpen] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
-  function search() {
+  const layersOpen = p.openPopover === "layers";
+  const helpOpen = p.openPopover === "help";
+  const togglePopover = (popover: Exclude<WorkspacePopover, null>) =>
+    p.onPopoverChange(p.openPopover === popover ? null : popover);
+  function openSearchPanel() {
     p.onPanel("search");
     setTimeout(() => document.getElementById("parcel-search")?.focus(), 50);
   }
@@ -61,10 +230,9 @@ export default function WorkspaceChrome(p: Props) {
           <Icon name="pin" size={16} />
           Upper Peninsula, MI
         </span>
-        <button className="header-search" aria-label="Find a property" onClick={search}>
+        <HeaderSearch {...p} />
+        <button className="header-search" aria-label="Find a property" onClick={openSearchPanel}>
           <Icon name="search" size={16} />
-          <span>Find a property</span>
-          <kbd>/</kbd>
         </button>
         <div className="header-account">
           <span className={`connection-status ${p.online ? "" : "offline"}`}>
@@ -97,7 +265,7 @@ export default function WorkspaceChrome(p: Props) {
         ))}
         <button
           className="rail-help"
-          onClick={() => setHelpOpen(!helpOpen)}
+          onClick={() => togglePopover("help")}
           aria-expanded={helpOpen}
           aria-label="Map help and keyboard shortcuts"
         >
@@ -126,10 +294,20 @@ export default function WorkspaceChrome(p: Props) {
         </div>
         <div className="map-toolbar-actions">
           <button
+            className={p.locating ? "map-tool active" : "map-tool"}
+            aria-label="Find the parcel at my location"
+            title="What parcel am I on?"
+            disabled={p.locating}
+            onClick={p.onLocate}
+          >
+            <Icon name="locate" size={17} />
+            <span>{p.locating ? "Locating…" : "Locate"}</span>
+          </button>
+          <button
             className={layersOpen ? "map-tool active" : "map-tool"}
             aria-label="Map layers"
             aria-expanded={layersOpen}
-            onClick={() => setLayersOpen(!layersOpen)}
+            onClick={() => togglePopover("layers")}
           >
             <Icon name="layers" size={17} />
             <span>Layers</span>
@@ -156,7 +334,7 @@ export default function WorkspaceChrome(p: Props) {
         <section className="layers-popover" aria-label="Map layers">
           <div className="section-heading-row">
             <h3>Map layers</h3>
-            <button className="icon-button" onClick={() => setLayersOpen(false)} aria-label="Close map layers">
+            <button className="icon-button" onClick={() => p.onPopoverChange(null)} aria-label="Close map layers">
               <Icon name="close" size={17} />
             </button>
           </div>
@@ -166,6 +344,17 @@ export default function WorkspaceChrome(p: Props) {
               <small>Approximate public GIS outlines</small>
             </span>
             <input type="checkbox" checked={p.boundaries} onChange={(e) => p.onBoundaries(e.target.checked)} />
+          </label>
+          <label className="toggle-row">
+            <span>
+              <strong>My saved parcels</strong>
+              <small>
+                {p.savedCount
+                  ? `${p.savedCount.toLocaleString()} saved ${p.savedCount === 1 ? "parcel" : "parcels"}, colored by tag`
+                  : "Parcels you save appear here, colored by tag"}
+              </small>
+            </span>
+            <input type="checkbox" checked={p.savedLayer} onChange={(e) => p.onSavedLayer(e.target.checked)} />
           </label>
           <label className="toggle-row">
             <span>
@@ -201,7 +390,14 @@ export default function WorkspaceChrome(p: Props) {
               <i className="selected-legend" />
               Selected property
             </span>
+            {PARCEL_TAGS.map((tag) => (
+              <span key={tag}>
+                <i className="tag-legend" style={{ background: TAG_COLORS[tag] }} />
+                Saved · {tagLabel(tag)}
+              </span>
+            ))}
           </div>
+          <p className="panel-note">Map settings are remembered in this browser.</p>
         </section>
       ) : null}
       <button
@@ -229,13 +425,13 @@ export default function WorkspaceChrome(p: Props) {
         <section className="help-popover" aria-label="Workspace guide">
           <div className="section-heading-row">
             <h3>Your field guide</h3>
-            <button className="icon-button" aria-label="Close guide" onClick={() => setHelpOpen(false)}>
+            <button className="icon-button" aria-label="Close guide" onClick={() => p.onPopoverChange(null)}>
               <Icon name="close" size={17} />
             </button>
           </div>
           <p>
-            Zoom in to see parcel outlines. Select a property for its record, then save it to a project or add it to a
-            comparison.
+            Zoom in to see parcel outlines and hover one for its address. Select a property for its record, then save it
+            to a project or add it to a comparison. Copied links open the selected parcel.
           </p>
           <dl>
             <div>
@@ -257,7 +453,7 @@ export default function WorkspaceChrome(p: Props) {
               </dd>
             </div>
             <div>
-              <dt>Map only</dt>
+              <dt>Close panel, then clear selection</dt>
               <dd>
                 <kbd>Esc</kbd>
               </dd>
@@ -268,7 +464,8 @@ export default function WorkspaceChrome(p: Props) {
       ) : null}
       <footer className="workspace-footer">
         <Icon name="shield" size={15} />
-        <span>{PARCEL_DISCLAIMER}</span>
+        <span className="disclaimer-full">{PARCEL_DISCLAIMER}</span>
+        <span className="disclaimer-short">{PARCEL_DISCLAIMER_SHORT}</span>
       </footer>
     </>
   );

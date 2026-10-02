@@ -15,7 +15,15 @@ export const TAG_COLORS: Record<ParcelTag, string> = {
   "follow-up": "#0d9488"
 };
 export const UNTAGGED_COLOR = "#475569";
-export const tagLabel = (tag: string | null | undefined) => (tag ? tag.replaceAll("-", " ") : "No tag");
+const TAG_LABELS: Record<ParcelTag, string> = {
+  lead: "Lead",
+  showing: "Showing",
+  "listing-prospect": "Listing prospect",
+  cma: "CMA",
+  "follow-up": "Follow-up"
+};
+export const tagLabel = (tag: string | null | undefined) =>
+  tag ? TAG_LABELS[tag as ParcelTag] ?? tag.replaceAll("-", " ") : "No tag";
 export const tagColor = (tag: string | null | undefined) =>
   tag && tag in TAG_COLORS ? TAG_COLORS[tag as ParcelTag] : UNTAGGED_COLOR;
 

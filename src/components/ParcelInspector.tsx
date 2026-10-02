@@ -5,30 +5,150 @@ import { createPortal } from "react-dom";
 import Icon from "@/components/Icon";
 import ParcelOutline from "@/components/ParcelOutline";
 import ParcelMeasurements from "@/components/ParcelMeasurements";
+import { ConfirmAction, EditableNote, TagDot, TagSelect } from "@/components/SavedWorkControls";
 import { measureParcel } from "@/lib/parcel-measurements";
 import {
   displayMoney,
   displayRecordDate,
   displayValue,
   downloadParcelsCsv,
+  formatAddress,
+  ownerMailingHint,
   PARCEL_DISCLAIMER,
   PARCEL_TAGS,
   parcelTitle,
-  safeSourceUrl
+  safeSourceUrl,
+  tagLabel
 } from "@/lib/parcel-presentation";
+import { savedEntriesFor, savedWork, type SavedEntry, type SavedProjectsState } from "@/lib/saved-work-client";
 import type { ParcelFeature } from "@/types/parcel";
+
+type Draft = { tag: string; note: string };
 
 type Props = {
   parcel: ParcelFeature;
-  draft: { tag: string; note: string };
-  onDraftChange: (draft: { tag: string; note: string }) => void;
+  draft: Draft | undefined;
+  onDraftChange: (draft: Draft) => void;
   projectName: string;
   onProjectNameChange: (name: string) => void;
-  onSaved: () => void;
+  onProjectSaved: (name: string) => void;
+  saved: SavedProjectsState;
   onCompare: () => void;
   compared: boolean;
   onFocus: () => void;
 };
+
+const MAILING_HINT_NOTE =
+  "Hint only, based on the recorded mailing address. Owners use other mailing addresses for many reasons — verify before relying on it.";
+
+function SaveMenu({
+  projectNames,
+  savedProjectNames,
+  saving,
+  onSave,
+  onClose
+}: {
+  projectNames: string[];
+  savedProjectNames: Set<string>;
+  saving: boolean;
+  onSave: (projectName: string) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [newName, setNewName] = useState("");
+  useEffect(() => {
+    const close = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [onClose]);
+  return (
+    <div
+      ref={ref}
+      className="save-menu"
+      role="dialog"
+      aria-label="Save to a project"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.stopPropagation();
+          onClose();
+        }
+      }}
+    >
+      <strong>Save to project</strong>
+      {projectNames.length ? (
+        <div className="save-menu-list">
+          {projectNames.map((name) => (
+            <button key={name} type="button" disabled={saving} onClick={() => onSave(name)}>
+              <Icon name={savedProjectNames.has(name) ? "check" : "folder"} size={15} />
+              <span>{name}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <form
+        className="save-menu-new"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (newName.trim()) onSave(newName.trim());
+        }}
+      >
+        <label htmlFor="save-menu-new-project">New project</label>
+        <div>
+          <input
+            id="save-menu-new-project"
+            value={newName}
+            maxLength={120}
+            autoFocus={!projectNames.length}
+            placeholder="e.g. Lakefront buyer search"
+            onChange={(event) => setNewName(event.target.value)}
+          />
+          <button className="primary-button compact-button" disabled={saving || !newName.trim()}>
+            Create
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function SavedActivity({ entries, onChanged }: { entries: SavedEntry[]; onChanged: () => void }) {
+  if (!entries.length) return null;
+  return (
+    <div className="saved-activity">
+      <h3 className="section-title">
+        <Icon name="folder" size={17} /> Saved in {entries.length === 1 ? "1 project" : `${entries.length} projects`}
+      </h3>
+      {entries.map(({ project, saved }) => (
+        <article key={saved.id} className="saved-entry">
+          <div className="saved-entry-head">
+            <strong>{project.name}</strong>
+            <TagSelect key={saved.tag ?? ""} savedParcelId={saved.id} tag={saved.tag} onChanged={onChanged} />
+          </div>
+          {saved.notes.length ? (
+            <div className="note-list">
+              {saved.notes.map((note) => (
+                <EditableNote key={note.id} note={note} onChanged={onChanged} />
+              ))}
+            </div>
+          ) : (
+            <p className="panel-note">No notes yet.</p>
+          )}
+          <ConfirmAction
+            label="Remove from project"
+            confirmLabel="Remove"
+            prompt={`Remove from “${project.name}”? Its notes are deleted too.`}
+            onConfirm={async () => {
+              await savedWork.remove(saved.id);
+              onChanged();
+            }}
+          />
+        </article>
+      ))}
+    </div>
+  );
+}
 
 export default function ParcelInspector({
   parcel,
@@ -36,7 +156,8 @@ export default function ParcelInspector({
   onDraftChange,
   projectName,
   onProjectNameChange,
-  onSaved,
+  onProjectSaved,
+  saved,
   onCompare,
   compared,
   onFocus
@@ -48,35 +169,39 @@ export default function ParcelInspector({
     if (printPreview) printDialogRef.current?.showModal();
   }, [printPreview]);
   const [tab, setTab] = useState<"overview" | "notes" | "source">("overview");
-  const { tag, note } = draft;
-  const setTag = (tag: string) => onDraftChange({ ...draft, tag });
-  const setNote = (note: string) => onDraftChange({ ...draft, note });
+  const [menuOpen, setMenuOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const p = parcel.properties;
   const measurements = useMemo(() => measureParcel(parcel.geometry), [parcel.geometry]);
   const sourceUrl = safeSourceUrl(p.sourceUrl);
+  const mailingHint = ownerMailingHint(p);
+  const entries = savedEntriesFor(saved.projects, p.id);
+  const noteCount = entries.reduce((total, entry) => total + entry.saved.notes.length, 0);
+  const projectNames = saved.projects.map((project) => project.name);
+  const savedProjectNames = new Set(entries.map((entry) => entry.project.name));
+  const currentEntry = entries.find((entry) => entry.project.name === projectName.trim());
+  const creatingProject = !projectNames.includes(projectName);
+  // Default the tag to what this parcel already has in the chosen project.
+  const { tag, note } = draft ?? { tag: currentEntry?.saved.tag ?? "lead", note: "" };
+  const setTag = (tag: string) => onDraftChange({ tag, note });
+  const setNote = (note: string) => onDraftChange({ tag, note });
 
-  async function save() {
+  async function save(targetProject = projectName.trim()) {
+    if (!targetProject) return;
     setSaving(true);
     setMessage("");
     setError("");
+    setMenuOpen(false);
     try {
-      const response = await fetch("/api/saved-parcels", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ parcelDatabaseId: p.id, projectName: projectName.trim(), tag, note })
-      });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || "Unable to save parcel.");
+      const payload = await savedWork.save({ parcelDatabaseId: p.id, projectName: targetProject, tag, note });
+      onProjectSaved(targetProject);
       setMessage(
-        payload.data?.persisted === false
-          ? "Demo preview only. This parcel was not stored."
-          : `Saved to ${projectName.trim()}.`
+        payload.data?.persisted === false ? "Demo preview only. This parcel was not stored." : `Saved to ${targetProject}.`
       );
-      setNote("");
-      onSaved();
+      onDraftChange({ tag, note: "" });
+      saved.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save parcel.");
     } finally {
@@ -107,7 +232,7 @@ export default function ParcelInspector({
           ["Parcel ID", p.parcelId],
           ["APN", p.apn],
           ["Owner", p.ownerName],
-          ["Mailing address", p.mailingAddress],
+          ["Mailing address", formatAddress(p.mailingAddress)],
           ["Recorded acreage", displayValue(p.acreage)],
           ["Land use / class", p.landUse],
           ["Assessed value (not market value)", displayMoney(p.assessedValue)],
@@ -127,6 +252,8 @@ export default function ParcelInspector({
     </article>
   );
 
+  const saveTarget = projectName.trim() || "a project";
+
   return (
     <>
       <section className="parcel-hero panel-section">
@@ -142,6 +269,30 @@ export default function ParcelInspector({
           {p.parcelId || p.apn || "Parcel ID unavailable"}
           <Icon name="copy" size={14} />
         </button>
+        {entries.length || mailingHint ? (
+          <div className="parcel-badges">
+            {entries.map(({ project, saved: savedParcel }) => (
+              <button
+                key={savedParcel.id}
+                type="button"
+                className="saved-chip"
+                onClick={() => setTab("notes")}
+                title="Show saved details and notes"
+              >
+                <TagDot tag={savedParcel.tag} />
+                <span>
+                  Saved in <b>{project.name}</b> · {tagLabel(savedParcel.tag)}
+                </span>
+              </button>
+            ))}
+            {mailingHint ? (
+              <span className="hint-chip" title={MAILING_HINT_NOTE}>
+                <Icon name="info" size={14} />
+                {mailingHint.label}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         <div className="parcel-summary">
           <ParcelOutline parcel={parcel} />
           <div className="hero-facts">
@@ -157,9 +308,41 @@ export default function ParcelInspector({
         </div>
         <ParcelMeasurements measurements={measurements} />
         <div className="parcel-actions">
-          <button className="primary-button" onClick={() => setTab("notes")}>
-            <Icon name="folder" size={17} /> Save property
-          </button>
+          <div className="split-button">
+            {currentEntry ? (
+              <button className="primary-button saved" onClick={() => setTab("notes")} title={`Saved in ${saveTarget}`}>
+                <Icon name="check" size={17} />
+                <span>Saved in {saveTarget}</span>
+              </button>
+            ) : (
+              <button
+                className="primary-button"
+                disabled={saving || !projectName.trim()}
+                onClick={() => void save()}
+                title={`Save to ${saveTarget}`}
+              >
+                <Icon name="folder" size={17} />
+                <span>{saving ? "Saving…" : `Save to ${saveTarget}`}</span>
+              </button>
+            )}
+            <button
+              className="primary-button split-toggle"
+              aria-label="Choose a project to save to"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen(!menuOpen)}
+            >
+              <Icon name="chevronDown" size={16} />
+            </button>
+            {menuOpen ? (
+              <SaveMenu
+                projectNames={projectNames}
+                savedProjectNames={savedProjectNames}
+                saving={saving}
+                onSave={(name) => void save(name)}
+                onClose={() => setMenuOpen(false)}
+              />
+            ) : null}
+          </div>
           <button
             className={compared ? "secondary-button selected" : "secondary-button"}
             onClick={onCompare}
@@ -172,12 +355,22 @@ export default function ParcelInspector({
             <Icon name="target" size={18} />
           </button>
         </div>
+        {message ? (
+          <p role="status" className="message success">
+            {message}
+          </p>
+        ) : null}
+        {error ? (
+          <p role="alert" className="message error">
+            {error}
+          </p>
+        ) : null}
       </section>
       <div className="inspector-tabs" role="tablist" aria-label="Property information">
         {(
           [
             ["overview", "Overview"],
-            ["notes", "Save & notes"],
+            ["notes", noteCount ? `Save & notes (${noteCount})` : "Save & notes"],
             ["source", "Source record"]
           ] as const
         ).map(([key, label]) => (
@@ -217,14 +410,19 @@ export default function ParcelInspector({
             <dl className="record-list">
               {[
                 ["Owner of record", p.ownerName],
-                ["Site address", p.siteAddress],
-                ["Mailing address", p.mailingAddress],
+                ["Site address", formatAddress(p.siteAddress)],
+                ["Mailing address", formatAddress(p.mailingAddress)],
                 ["APN", p.apn],
                 ["Land use / class", p.landUse]
               ].map(([label, value]) => (
                 <div key={label}>
                   <dt>{label}</dt>
                   <dd>{displayValue(value)}</dd>
+                  {label === "Mailing address" && mailingHint ? (
+                    <dd className="record-hint">
+                      <strong>{mailingHint.label}.</strong> {MAILING_HINT_NOTE}
+                    </dd>
+                  ) : null}
                 </div>
               ))}
             </dl>
@@ -259,16 +457,37 @@ export default function ParcelInspector({
                 void save();
               }}
             >
-              <label>
-                Project name
-                <input
-                  required
-                  maxLength={120}
-                  value={projectName}
-                  onChange={(e) => onProjectNameChange(e.target.value)}
-                  placeholder="e.g. Lakefront buyer search"
-                />
-              </label>
+              {projectNames.length ? (
+                <label>
+                  Project
+                  <select
+                    value={creatingProject ? "__new__" : projectName}
+                    disabled={saving}
+                    onChange={(event) => onProjectNameChange(event.target.value === "__new__" ? "" : event.target.value)}
+                  >
+                    {projectNames.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                        {savedProjectNames.has(name) ? " ✓" : ""}
+                      </option>
+                    ))}
+                    <option value="__new__">＋ New project…</option>
+                  </select>
+                </label>
+              ) : null}
+              {creatingProject ? (
+                <label>
+                  {projectNames.length ? "New project name" : "Project name"}
+                  <input
+                    required
+                    maxLength={120}
+                    value={projectName}
+                    autoFocus={projectNames.length > 0}
+                    onChange={(e) => onProjectNameChange(e.target.value)}
+                    placeholder="e.g. Lakefront buyer search"
+                  />
+                </label>
+              ) : null}
               <fieldset className="tag-picker">
                 <legend>Workflow tag</legend>
                 {PARCEL_TAGS.map((value) => (
@@ -280,7 +499,8 @@ export default function ParcelInspector({
                     className={tag === value ? "tag active" : "tag"}
                     onClick={() => setTag(value)}
                   >
-                    {value.replaceAll("-", " ")}
+                    <TagDot tag={value} />
+                    {tagLabel(value)}
                   </button>
                 ))}
               </fieldset>
@@ -288,17 +508,19 @@ export default function ParcelInspector({
                 Private note
                 <textarea
                   disabled={saving}
-                  maxLength={5000}
+                  maxLength={2000}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="Showing observations, questions to verify, or next steps…"
                 />
+                {note.length > 1800 ? <small className="char-count">{note.length.toLocaleString()} / 2,000</small> : null}
               </label>
               <button className="primary-button" disabled={saving || !projectName.trim()}>
                 <Icon name="folder" size={17} />
-                {saving ? "Saving…" : "Save to project"}
+                {saving ? "Saving…" : currentEntry ? "Update saved property" : "Save to project"}
               </button>
             </form>
+            <SavedActivity entries={entries} onChanged={saved.refresh} />
           </>
         ) : null}
         {tab === "source" ? (
@@ -313,7 +535,9 @@ export default function ParcelInspector({
                 ["Source updated", displayRecordDate(p.sourceUpdatedAt)],
                 ["Imported", displayRecordDate(p.importedAt)],
                 ["Source key", p.sourceKey],
-                ["Source feature ID", p.sourceFeatureId]
+                ["Source feature ID", p.sourceFeatureId],
+                ["Site address (as recorded)", p.siteAddress],
+                ["Mailing address (as recorded)", p.mailingAddress]
               ].map(([label, value]) => (
                 <div key={label}>
                   <dt>{label}</dt>
@@ -329,16 +553,6 @@ export default function ParcelInspector({
               <p className="panel-note">No source link available.</p>
             )}
           </>
-        ) : null}
-        {message ? (
-          <p role="status" className="message success">
-            {message}
-          </p>
-        ) : null}
-        {error ? (
-          <p role="alert" className="message error">
-            {error}
-          </p>
         ) : null}
       </section>
       <p className="verification-note">
