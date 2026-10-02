@@ -827,6 +827,8 @@ export default function ParcelMap() {
     const vectorTilesActive = Boolean(map.getSource(PARCEL_TILE_SOURCE_ID));
     for (const id of [
       PARCEL_TILE_LINE_LAYER_ID, PARCEL_TILE_FILL_LAYER_ID,
+      // The hover outline also draws from the tile source, so it must hide with the rest or tiles keep loading.
+      PARCEL_TILE_HOVER_LAYER_ID, OFFLINE_PARCEL_HOVER_LAYER_ID,
       PARCEL_GEOJSON_LINE_LAYER_ID, PARCEL_GEOJSON_FILL_LAYER_ID,
       OFFLINE_PARCEL_LINE_LAYER_ID, OFFLINE_PARCEL_FILL_LAYER_ID
     ]) {
