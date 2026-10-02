@@ -64,6 +64,8 @@ test("vector tiles contain a parcels layer and empty tiles return null",()=>{
  const tile=store.tile(z,x,y);
  assert.ok(tile && tile.length>0);
  assert.ok(Buffer.from(tile).includes(Buffer.from("parcels")));
+ // The hover tooltip reads the site address straight from the tile.
+ assert.ok(Buffer.from(tile).includes(Buffer.from("100 Test Road")));
  const original=Uint8Array.from(tile);
  tile.fill(0);
  assert.deepEqual(Uint8Array.from(store.tile(z,x,y)!),original);

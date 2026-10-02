@@ -85,6 +85,7 @@ async function getParcelTile(_request: Request, context: TileRouteContext) {
           p.source_feature_id,
           p.parcel_id,
           p.apn,
+          p.site_address,
           ST_AsMVTGeom(
             CASE
               WHEN $6::double precision > 0

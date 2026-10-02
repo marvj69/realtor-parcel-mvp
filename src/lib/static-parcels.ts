@@ -89,7 +89,7 @@ export class StaticParcelStore {
     const features=this.candidates(box,this.count).map(r=>{
       const row=decodeParcel(r.payload), feature=parcelRowToFeature(row)!;
       return {...feature,properties:{id:row.id,source_key:row.source_key,source_feature_id:row.source_feature_id,
-        parcel_id:row.parcel_id,apn:row.apn}};
+        parcel_id:row.parcel_id,apn:row.apn,site_address:row.site_address}};
     });
     if (!features.length) { this.tiles.set(key, null, 0); return null; }
     const index=new geojsonvt({type:"FeatureCollection",features},{maxZoom:z,indexMaxZoom:0,extent:4096,buffer:64,tolerance:3});

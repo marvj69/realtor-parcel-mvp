@@ -45,6 +45,7 @@ export const apiRateLimits = {
   lookup: { max: 120, windowMs: 60_000 },
   search: { max: 60, windowMs: 60_000 },
   saveParcel: { max: 20, windowMs: 60_000 },
+  savedWork: { max: 60, windowMs: 60_000 },
   auth: { max: 20, windowMs: 60_000 },
   projects: { max: 60, windowMs: 60_000 },
   tiles: { max: 3000, windowMs: 60_000 }

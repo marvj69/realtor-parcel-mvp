@@ -48,6 +48,10 @@ export function searchDemoParcels(q: string, limit: number): ParcelSearchResult[
     }));
 }
 
+export function getDemoParcelById(id: string): ParcelFeature | null {
+  return DEMO_PARCELS.find((feature) => feature.properties.id === id) ?? null;
+}
+
 export function hasDemoParcel(id: string) {
   return DEMO_PARCELS.some((feature) => feature.properties.id === id);
 }
