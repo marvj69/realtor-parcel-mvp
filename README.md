@@ -17,20 +17,27 @@ This starter is designed for GitHub + Vercel + Neon and gives a coding agent eno
 ## Parcel workspace
 
 - Responsive map workspace with desktop navigation and an expandable mobile panel.
-- Topographic and satellite basemaps, parcel/label controls, fill opacity, compass,
-  location control, scale, fullscreen, and copyable map-view links.
-- Ranked address/APN/owner search with county, source land-use, and acreage filters
-  **on the returned results**, plus sorting and CSV export (up to 50 matches).
+- Topographic and satellite basemaps, parcel/label/saved-parcel layers, fill opacity,
+  compass, scale, fullscreen, and copyable links that reopen the selected parcel.
+- Hover outlines with address labels; clicking the selected parcel reopens its details,
+  and Esc or an empty-map click clears it. A "Locate" button selects the parcel at the
+  device's location.
+- Header typeahead plus ranked address/APN/owner search with match labels, numbered map
+  pins, and county, land-use, acreage, and mailing-address hint filters **on the returned
+  results**, plus sorting and CSV export (up to 50 matches).
 - Parcel overview with a preview of the actual boundary geometry, a source record,
-  verified-source link, and a printable property brief preview.
+  verified-source link, and a printable property brief preview. Addresses are cleaned up
+  for display only; the Source record tab shows them as recorded.
 - Compare up to three parcels and export their public records as CSV.
-- Save parcels and workflow tags to projects; search loaded projects/properties/
-  notes and filter by tag. Notes and saves continue to use the existing Neon APIs.
-- Recent selections, comparisons, and unsaved note drafts stay in memory for the
-  current page session. Save a note to a project for durable storage.
+- One-click save to the last-used project, saved status and note history on each
+  property, and full project management: rename/delete projects, change tags, remove
+  parcels, and edit/delete notes (owner-scoped Neon APIs).
+- Map settings, recently viewed parcels, and the last-used project are remembered in
+  this browser. Comparisons and unsaved note drafts stay in page memory.
 - Distance/area/box measurements and browser-saved offline parcel areas.
-- Persistent approximate-boundary disclaimer; missing data remains unavailable,
-  and assessed values are labeled separately from market value.
+- Persistent approximate-boundary disclaimer (an equivalent shorter version on phones);
+  missing data remains unavailable, and assessed values are labeled separately from
+  market value.
 
 See [Workspace features and verification](docs/UI_WORKSPACE.md) for limits and checks.
 

@@ -1,3 +1,16 @@
+# Usability pass
+
+- [x] Project management: rename/delete projects, change tags, remove saved parcels, edit/delete notes (owner-scoped routes).
+- [x] Project picker, one-click save to the last-used project, saved status and note history on each property.
+- [x] Saved-parcel map layer colored by workflow tag.
+- [x] Hover outline and address label; selected parcel reopens on click; Esc/empty-map click clears it.
+- [x] Shareable `?parcel=<id>` links, zoom-in prompt below parcel zoom, remembered map settings.
+- [x] Search match labels, numbered result pins, header typeahead, display-only address cleanup.
+- [x] Mailing-address (absentee-owner) hint and result filter, worded as a hint to verify.
+- [x] Recently viewed parcels saved in the browser.
+- [x] Shorter equivalent phone disclaimer, "Locate" parcel-at-my-location, text contrast and minimum sizes, Esc closes popovers first.
+- [ ] Deploy and verify on production.
+
 # Workspace UI refresh
 
 - [x] Desktop navigation rail and property sidebar; mobile bottom navigation and expandable panel.
@@ -97,7 +110,7 @@ and deployment instructions are in docs/STATIC_PARCELS.md.
 - [x] Basic printable property brief.
 - [x] Measurement tools for distance/area.
 - [x] Browser-saved offline parcel area downloads.
-- [ ] Absentee owner hint when owner mailing address differs from site address.
+- [x] Absentee owner hint when owner mailing address differs from site address (hint only; verify before relying on it).
 - [x] Acreage/land-use filters for returned search results (not dataset-wide filters).
 
 ## Production
@@ -129,7 +142,6 @@ and deployment instructions are in docs/STATIC_PARCELS.md.
 ## Current blockers
 
 - [ ] Production Vercel still needs `APP_AUTH_PASSWORD` and `APP_AUTH_SESSION_SECRET` set before treating the live app as private.
-- [ ] Saved-project sidebar can list saved parcels and notes, but full project management/edit/delete screens are not built yet.
 - [ ] Vector tiles are live locally/API-smoked, but still need final production browser verification after deploy.
 - [ ] Rate limiting is in-memory per serverless instance; use durable Redis/Edge Config later if this becomes multi-user/high-traffic.
 
@@ -137,7 +149,7 @@ and deployment instructions are in docs/STATIC_PARCELS.md.
 
 - [ ] Set production auth env vars in Vercel and verify unauthenticated live access is blocked.
 - [ ] Deploy this pass and verify live map tiles, search, sign-in, saved-project list, click lookup, and save flow.
-- [ ] Add project/saved-parcel edit/delete actions with owner-scoped API routes.
+- [x] Add project/saved-parcel edit/delete actions with owner-scoped API routes.
 - [ ] Add import-job logging before any automated data refresh work.
 - [x] Add a printable selected parcel brief and CSV export for selected/saved parcels.
 
