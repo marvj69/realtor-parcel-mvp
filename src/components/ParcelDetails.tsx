@@ -1,11 +1,28 @@
 "use client";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type FormEvent,
+  type PointerEvent as ReactPointerEvent
+} from "react";
 import SavedProjectsSidebar from "@/components/SavedProjectsSidebar";
 import ParcelInspector from "@/components/ParcelInspector";
 import ParcelExplorer from "@/components/ParcelExplorer";
 import ParcelCompare from "@/components/ParcelCompare";
 import Icon from "@/components/Icon";
 import { readStored, STORAGE_KEYS, writeStored } from "@/lib/browser-prefs";
+import { useLayoutMode } from "@/lib/layout-mode";
+import {
+  DEFAULT_SHEET_STATE,
+  nextSheetState,
+  sheetHeights,
+  snapSheet,
+  type SheetState
+} from "@/lib/sheet";
 import type { SavedProjectsState } from "@/lib/saved-work-client";
 import type { AppPanel, MeasurementMode, MeasurementPoint, MeasurementSummary } from "@/types/measurement";
 import type { OfflineAreaSummary } from "@/types/offline";
@@ -13,6 +30,16 @@ import type { ParcelFeature, ParcelProperties, ParcelSearchResult, SavedParcelSu
 
 const DEFAULT_PROJECT_NAME = "My property research";
 const isString = (value: unknown): value is string => typeof value === "string";
+
+const PANEL_TITLES: Record<AppPanel, string> = {
+  map: "Map",
+  search: "Explore",
+  details: "Property",
+  saved: "Projects",
+  compare: "Compare",
+  measure: "Measure",
+  offline: "Offline areas"
+};
 
 type Props = {
   saved: SavedProjectsState;
@@ -73,6 +100,16 @@ function bytes(value: number | null | undefined) {
 function formatCoordinate(value: number) {
   return value.toFixed(6);
 }
+
+type DragState = {
+  startY: number;
+  startHeight: number;
+  lastY: number;
+  lastTime: number;
+  velocity: number;
+  moved: boolean;
+};
+
 export default function ParcelDetails(props: Props) {
   const {
     activePanel,
@@ -106,7 +143,6 @@ export default function ParcelDetails(props: Props) {
     onOfflineAreaDelete
   } = props;
   const [parcelDrafts, setParcelDrafts] = useState<Record<string, { tag: string; note: string }>>({});
-  const [expanded, setExpanded] = useState(false);
   // The last project used is the one-click save target, remembered in this browser. A remembered
   // name that no longer exists (renamed or deleted elsewhere) falls back to the newest project.
   const [chosenProject, setChosenProject] = useState<{ name: string; fromStorage: boolean } | null>(() => {
@@ -137,46 +173,144 @@ export default function ParcelDetails(props: Props) {
     return () => clearTimeout(timeout);
   }, [searchQuery]);
   const isCollapsed = activePanel === "map";
+
+  // ---------- Bottom sheet (phones and portrait tablets) ----------
+  const isSheet = useLayoutMode() === "sheet";
+  const asideRef = useRef<HTMLElement>(null);
+  const dragRef = useRef<DragState | null>(null);
+  const [areaHeight, setAreaHeight] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  // A person's chosen size only applies to the panel they chose it on; a new panel opens at its own default.
+  const [choice, setChoice] = useState<{ panel: AppPanel; state: SheetState } | null>(null);
+  const sheetState: SheetState =
+    choice && choice.panel === activePanel ? choice.state : DEFAULT_SHEET_STATE[activePanel];
+  const heights = sheetHeights(activePanel, areaHeight);
+  const targetPx = isCollapsed ? 0 : heights[sheetState];
+
+  useEffect(() => {
+    if (!isSheet) return;
+    const wrap = asideRef.current?.parentElement?.querySelector<HTMLElement>(".map-wrap");
+    if (!wrap) return;
+    const update = () => setAreaHeight(wrap.clientHeight);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(wrap);
+    return () => observer.disconnect();
+  }, [isSheet]);
+
+  /** Applies a height straight to the DOM so dragging never re-renders the panels. */
+  const applyHeight = useCallback((px: number) => {
+    const aside = asideRef.current;
+    if (!aside) return;
+    aside.style.setProperty("--sheet-px", `${Math.round(px)}px`);
+    aside.parentElement?.style.setProperty("--sheet-covered", `${Math.round(px)}px`);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (isSheet) applyHeight(targetPx);
+    else asideRef.current?.parentElement?.style.setProperty("--sheet-covered", "0px");
+  }, [isSheet, targetPx, applyHeight]);
+
+  const chooseState = (state: SheetState) => setChoice({ panel: activePanel, state });
+
+  function onHeadPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!isSheet || event.button !== 0 || (event.target as HTMLElement).closest("button")) return;
+    const aside = asideRef.current;
+    if (!aside) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      startY: event.clientY,
+      startHeight: aside.getBoundingClientRect().height,
+      lastY: event.clientY,
+      lastTime: performance.now(),
+      velocity: 0,
+      moved: false
+    };
+    setDragging(true);
+  }
+
+  function onHeadPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const delta = event.clientY - drag.startY;
+    if (Math.abs(delta) > 4) drag.moved = true;
+    const now = performance.now();
+    const elapsed = Math.max(1, now - drag.lastTime);
+    drag.velocity = 0.7 * drag.velocity + 0.3 * ((event.clientY - drag.lastY) / elapsed);
+    drag.lastY = event.clientY;
+    drag.lastTime = now;
+    if (drag.moved) {
+      applyHeight(Math.min(heights.full, Math.max(heights.peek - 90, drag.startHeight - delta)));
+    }
+  }
+
+  function endHeadDrag(event: ReactPointerEvent<HTMLDivElement>, cancelled = false) {
+    const drag = dragRef.current;
+    if (!drag) return;
+    dragRef.current = null;
+    setDragging(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (!drag.moved || cancelled) {
+      applyHeight(targetPx);
+      if (!cancelled) chooseState(nextSheetState(sheetState));
+      return;
+    }
+    const current = asideRef.current?.getBoundingClientRect().height ?? targetPx;
+    const { state, close } = snapSheet(heights, current, drag.velocity);
+    if (close) {
+      onActivePanelChange("map");
+      return;
+    }
+    applyHeight(heights[state]);
+    chooseState(state);
+  }
+
+  // Raise the sheet when a text field gets focus (so the keyboard doesn't cover it) or when
+  // keyboard navigation reaches content hidden below the peek.
+  function onPanelFocus(event: FocusEvent<HTMLElement>) {
+    if (!isSheet || (event.target as HTMLElement).closest(".panel-head")) return;
+    const target = event.target as HTMLElement;
+    if ((target.tagName === "INPUT" || target.tagName === "TEXTAREA") && sheetState !== "full") chooseState("full");
+    else if (sheetState === "peek" && target.matches(":focus-visible")) chooseState("half");
+  }
+
   return (
     <aside
-      className={`side-panel ${isCollapsed ? "collapsed" : ""} ${expanded ? "expanded" : ""}`}
+      ref={asideRef}
+      className={`side-panel${isCollapsed ? " collapsed" : ""}${dragging ? " dragging" : ""}`}
       aria-label="Parcel workspace"
+      data-panel={activePanel}
+      data-state={isSheet ? sheetState : undefined}
+      onFocusCapture={onPanelFocus}
     >
       {!isCollapsed ? (
         <>
-          <div className="panel-topline">
-            <span>
-              <Icon name="layers" size={15} />
-              WORKSPACE <span>/</span>{" "}
-              {activePanel === "search"
-                ? "Explore"
-                : activePanel === "details"
-                ? "Property"
-                : activePanel === "saved"
-                ? "Projects"
-                : activePanel === "compare"
-                ? "Compare"
-                : activePanel === "offline"
-                ? "Offline areas"
-                : "Measure"}
-            </span>
+          <div
+            className="panel-head"
+            onPointerDown={onHeadPointerDown}
+            onPointerMove={onHeadPointerMove}
+            onPointerUp={(event) => endHeadDrag(event)}
+            onPointerCancel={(event) => endHeadDrag(event, true)}
+          >
+            <span className="sheet-grabber" aria-hidden="true" />
+            <h2 className="panel-title">{PANEL_TITLES[activePanel]}</h2>
             <button
-              className="icon-button panel-expand"
-              aria-label={expanded ? "Reduce workspace panel" : "Expand workspace panel"}
-              aria-expanded={expanded}
-              onClick={() => setExpanded(!expanded)}
+              className="icon-button sheet-toggle"
+              aria-label={sheetState === "full" ? "Reduce workspace panel" : "Expand workspace panel"}
+              aria-expanded={sheetState === "full"}
+              onClick={() => chooseState(sheetState === "full" ? "half" : "full")}
             >
-              <Icon name="expand" size={15} />
+              <Icon name={sheetState === "full" ? "chevronDown" : "chevronUp"} size={20} />
             </button>
             <button
               className="icon-button"
               aria-label="Collapse workspace panel"
               onClick={() => onActivePanelChange("map")}
             >
-              <Icon name="close" size={16} />
+              <Icon name="close" size={20} />
             </button>
           </div>
-          <div className="bottom-panel" key={activePanel}>
+          <div className="panel-body" key={activePanel}>
             {activePanel === "search" ? (
               <ParcelExplorer
                 query={searchQuery}
@@ -232,9 +366,9 @@ export default function ParcelDetails(props: Props) {
                 />
               ) : (
                 <div className="empty-state">
-                  <Icon name="pin" size={36} />
-                  <h2>Select a property</h2>
-                  <p>Click an outlined parcel on the map or search by address, owner, or parcel ID.</p>
+                  <Icon name="pin" size={28} />
+                  <h3>Select a property</h3>
+                  <p>Tap an outlined parcel on the map, or search by address, owner, or parcel ID.</p>
                   <button className="primary-button" onClick={() => onActivePanelChange("search")}>
                     Find a parcel
                     <Icon name="arrow" size={16} />
@@ -252,24 +386,20 @@ export default function ParcelDetails(props: Props) {
             ) : null}
             {activePanel === "offline" ? (
               <section className="panel-section offline-panel">
-                <div className="section-heading-row">
-                  <div>
-                    <h2>Offline areas</h2>
-                    <p>
-                      Parcel outlines and details are saved in this browser. Basemap imagery may still need a network
-                      connection unless the browser has cached those tiles.
-                    </p>
-                  </div>
-                </div>
+                <p className="panel-lead">
+                  Parcel outlines and details are saved in this browser. Basemap imagery may still need a network
+                  connection unless the browser has cached those tiles.
+                </p>
 
-                <div className="button-row">
+                <div className="button-stack">
                   <button
                     className="primary-button"
                     type="button"
                     disabled={offlineLoading || !offlineStorageSupported}
                     onClick={onOfflineCurrentViewDownload}
                   >
-                    {offlineLoading ? "Saving..." : "Download current view"}
+                    <Icon name="download" size={17} />
+                    {offlineLoading ? "Saving…" : "Download current view"}
                   </button>
                   <button
                     className="secondary-button"
@@ -277,6 +407,7 @@ export default function ParcelDetails(props: Props) {
                     disabled={offlineLoading || !offlineStorageSupported || !offlineMeasuredAreaAvailable}
                     onClick={onOfflineMeasuredAreaDownload}
                   >
+                    <Icon name="ruler" size={17} />
                     Download measured area
                   </button>
                 </div>
@@ -287,8 +418,12 @@ export default function ParcelDetails(props: Props) {
                 {offlineStatus ? <p className="message success">{offlineStatus}</p> : null}
                 {offlineError ? <p className="message error">{offlineError}</p> : null}
 
+                <h3 className="section-title">Saved areas</h3>
                 {offlineAreas.length === 0 ? (
-                  <p className="panel-note">No offline parcel areas saved in this browser yet.</p>
+                  <div className="empty-state compact">
+                    <Icon name="offline" size={26} />
+                    <p>No offline parcel areas saved in this browser yet.</p>
+                  </div>
                 ) : (
                   <div className="offline-area-list">
                     {offlineAreas.map((area) => (
@@ -310,10 +445,10 @@ export default function ParcelDetails(props: Props) {
                             disabled={offlineLoading}
                             onClick={() => onOfflineAreaOpen(area.id)}
                           >
-                            View
+                            View on map
                           </button>
                           <button
-                            className="text-button"
+                            className="text-button danger-text"
                             type="button"
                             disabled={offlineLoading}
                             onClick={() => onOfflineAreaDelete(area.id)}
@@ -330,14 +465,13 @@ export default function ParcelDetails(props: Props) {
 
             {activePanel === "measure" ? (
               <section className="panel-section measure-panel">
-                <div className="section-heading-row">
-                  <div>
-                    <h2>Measure</h2>
-                    <p>Tap the map to add points. Use the point list to remove individual points.</p>
-                  </div>
+                <div className="measurement-readout">
+                  <span>{measurementSummary.title}</span>
+                  <strong>{measurementSummary.primary}</strong>
+                  <small>{measurementSummary.secondary}</small>
                 </div>
 
-                <div className="measure-mode-row" role="group" aria-label="Measurement type">
+                <div className="segmented measure-modes" role="group" aria-label="Measurement type">
                   {(
                     [
                       ["distance", "Distance"],
@@ -357,13 +491,6 @@ export default function ParcelDetails(props: Props) {
                   ))}
                 </div>
 
-                <div className="measurement-readout">
-                  <span>{measurementSummary.title}</span>
-                  <strong>{measurementSummary.primary}</strong>
-                  <small>{measurementSummary.secondary}</small>
-                  <p>{measurementSummary.hint}</p>
-                </div>
-
                 <div className="button-row">
                   <button
                     className="secondary-button"
@@ -371,6 +498,7 @@ export default function ParcelDetails(props: Props) {
                     onClick={onMeasurementUndo}
                     disabled={measurementPoints.length === 0}
                   >
+                    <Icon name="undo" size={16} />
                     Undo point
                   </button>
                   <button
@@ -383,18 +511,20 @@ export default function ParcelDetails(props: Props) {
                   </button>
                 </div>
 
+                <p className="panel-note">{measurementSummary.hint}</p>
+
                 {measurementPoints.length > 0 ? (
                   <div className="measurement-point-list">
                     {measurementPoints.map((point, index) => (
                       <div className="measurement-point-row" key={point.id}>
                         <span>
                           Point {index + 1}
-                          <small>
+                          <small className="mono">
                             {formatCoordinate(point.lat)}, {formatCoordinate(point.lng)}
                           </small>
                         </span>
                         <button
-                          className="text-button"
+                          className="text-button danger-text"
                           type="button"
                           onClick={() => onMeasurementPointRemove(point.id)}
                         >

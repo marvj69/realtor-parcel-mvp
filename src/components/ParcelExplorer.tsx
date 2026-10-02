@@ -20,6 +20,8 @@ export const MARKETS = [
   { name: "Iron Mountain", description: "Southern Upper Peninsula", center: [-88.067, 45.8202] as [number, number] }
 ];
 
+const NO_MATCHES = "No parcel matches found.";
+
 type Props = {
   query: string;
   onQueryChange: (query: string) => void;
@@ -54,7 +56,9 @@ export default function ParcelExplorer({
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState(EMPTY_RESULT_FILTERS);
   const filtered = filterParcelResults(results, filters);
-  const showingResults = query.trim().length >= 2 && results.length > 0;
+  const trimmed = query.trim();
+  const showingResults = trimmed.length >= 2 && results.length > 0;
+  const noMatches = trimmed.length >= 2 && !loading && results.length === 0 && error === NO_MATCHES;
   const filterCount = [filters.county, filters.minAcres, filters.maxAcres, filters.landUse, filters.mailing].filter(
     Boolean
   ).length;
@@ -70,63 +74,68 @@ export default function ParcelExplorer({
   );
   return (
     <>
-      <section className="panel-section explore-heading">
-        <div className="eyebrow">Upper Peninsula, Michigan</div>
-        <h2>
-          Explore properties<span className="heading-dot">.</span>
-        </h2>
-        <p>Local knowledge starts with the map.</p>
+      <section className="panel-section explore-search">
         <form className="search-form" onSubmit={onSubmit} role="search">
           <label className="sr-only" htmlFor="parcel-search">
             Search address, owner, or parcel ID
           </label>
-          <div className="search-box">
-            <Icon name="search" size={19} />
-            <input
-              id="parcel-search"
-              autoComplete="off"
-              aria-describedby="owner-search-help"
-              maxLength={120}
-              value={query}
-              onChange={(event) => onQueryChange(event.target.value)}
-              placeholder="Address, owner, or parcel ID"
-            />
-            {query ? (
-              <button
-                className="icon-button"
-                type="button"
-                aria-label="Clear search"
-                onClick={() => {
-                  onQueryChange("");
-                  setFilters(EMPTY_RESULT_FILTERS);
-                }}
-              >
-                <Icon name="close" size={15} />
-              </button>
-            ) : (
-              <kbd>/</kbd>
-            )}
+          <div className="search-row">
+            <div className="search-field">
+              <Icon name="search" size={18} />
+              <input
+                id="parcel-search"
+                type="text"
+                autoComplete="off"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="search"
+                aria-describedby="owner-search-help"
+                maxLength={120}
+                value={query}
+                onChange={(event) => onQueryChange(event.target.value)}
+                placeholder="Address, owner, or parcel ID"
+              />
+              {loading ? (
+                <span className="spinner" role="status" aria-label="Searching parcel records" />
+              ) : query ? (
+                <button
+                  className="icon-button"
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => {
+                    onQueryChange("");
+                    setFilters(EMPTY_RESULT_FILTERS);
+                  }}
+                >
+                  <Icon name="close" size={16} />
+                </button>
+              ) : (
+                <kbd aria-hidden="true">/</kbd>
+              )}
+            </div>
+            <button
+              type="button"
+              className={showFilters || filterCount ? "icon-button bordered filter-toggle active" : "icon-button bordered filter-toggle"}
+              aria-expanded={showFilters}
+              aria-label={filterCount ? `Filters, ${filterCount} active` : "Filters"}
+              title="Filter results"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <Icon name="filter" size={18} />
+              {filterCount ? <span className="count-badge">{filterCount}</span> : null}
+            </button>
           </div>
-          <button className="primary-button search-submit" disabled={loading || query.trim().length < 2}>
-            {loading ? "Searching records…" : "Search parcels"}
-            <Icon name="arrow" size={17} />
+          <button className="sr-only" type="submit" disabled={loading || trimmed.length < 2}>
+            Search parcels
           </button>
         </form>
-        <p id="owner-search-help">Owner names work in either order. Try a last name, first and last name, or business name.</p>
-        <div className="search-tools">
-          <button
-            className={showFilters ? "text-button active" : "text-button"}
-            aria-expanded={showFilters}
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <Icon name="filter" size={16} />
-            Filters {filterCount ? <span className="count-badge">{filterCount}</span> : null}
-          </button>
-          <span>Address · APN · Owner</span>
-        </div>
+        <p id="owner-search-help" className="field-hint">
+          Owner names work in either order. Try a last name, first and last name, or a business name.
+        </p>
         {showFilters ? (
           <div className="filter-panel">
-            <p>Filter the returned results (up to 50 matches). Mailing filters are hints from the recorded address.</p>
+            <p>Filters apply to the returned results (up to 50 matches). Mailing filters are hints from the recorded address.</p>
             <div className="filter-grid">
               <label>
                 County
@@ -165,6 +174,7 @@ export default function ParcelExplorer({
                 Min. acres
                 <input
                   type="number"
+                  inputMode="decimal"
                   min="0"
                   step="any"
                   placeholder="No minimum"
@@ -176,6 +186,7 @@ export default function ParcelExplorer({
                 Max. acres
                 <input
                   type="number"
+                  inputMode="decimal"
                   min="0"
                   step="any"
                   placeholder="No maximum"
@@ -189,26 +200,33 @@ export default function ParcelExplorer({
                 Maximum acreage must be at least the minimum.
               </p>
             ) : null}
-            <button className="text-button" onClick={() => setFilters(EMPTY_RESULT_FILTERS)}>
+            <button className="text-button" type="button" onClick={() => setFilters(EMPTY_RESULT_FILTERS)}>
               Reset filters
             </button>
           </div>
         ) : null}
       </section>
-      {error ? (
+      {error && !noMatches ? (
         <p role="status" className="message search-message">
           {error}
         </p>
       ) : null}
-      {loading ? (
+      {loading && !showingResults ? (
         <div className="loading-results" aria-label="Searching parcels">
           <div />
           <div />
           <div />
         </div>
       ) : null}
+      {noMatches ? (
+        <div className="empty-state">
+          <Icon name="searchX" size={28} />
+          <h3>No matches for “{trimmed}”</h3>
+          <p>Try fewer words, a street name without the number, or an owner’s last name.</p>
+        </div>
+      ) : null}
       {showingResults ? (
-        <section className="panel-section results-section">
+        <section className="results-section">
           <div className="results-heading">
             <h3>
               {filtered.length} <span>{filtered.length === 1 ? "result" : "results"}</span>
@@ -218,6 +236,7 @@ export default function ParcelExplorer({
             </label>
             <select
               id="result-sort"
+              className="compact-select"
               value={filters.sort}
               onChange={(e) => setFilters({ ...filters, sort: e.target.value })}
             >
@@ -233,7 +252,7 @@ export default function ParcelExplorer({
               aria-label="Show these results on the map"
               onClick={onFitResults}
             >
-              <Icon name="map" size={17} />
+              <Icon name="map" size={18} />
             </button>
             <button
               className="icon-button"
@@ -242,13 +261,13 @@ export default function ParcelExplorer({
               aria-label="Export displayed results"
               onClick={() => downloadParcelsCsv(filtered, "parcel-search")}
             >
-              <Icon name="download" size={17} />
+              <Icon name="download" size={18} />
             </button>
           </div>
-          {results.length === 50 ? (
-            <p className="panel-note">Top 50 matches. Refine your search for more specific results.</p>
-          ) : null}
-          <p className="panel-note">Numbered pins on the map match this list.</p>
+          <p className="results-note">
+            {results.length === 50 ? "Top 50 matches. Refine your search for more specific results. " : ""}
+            Numbered pins on the map match this list.
+          </p>
           <div className="search-results">
             {filtered.map((result, index) => {
               const matchLabel = matchKindLabel(result.matchKind);
@@ -260,20 +279,26 @@ export default function ParcelExplorer({
                   onClick={() => onSelect(result)}
                   disabled={!result.center}
                 >
-                  <div className="result-leading">
-                    <span className="result-number">{index + 1}</span>
-                    <span className="county-chip">{result.sourceCounty || "County unavailable"}</span>
-                    {matchLabel ? <span className="match-chip">{matchLabel}</span> : null}
-                    <Icon name="chevron" size={15} />
-                  </div>
-                  <strong className="result-title">{parcelTitle(result)}</strong>
-                  <span className="result-owner">{result.ownerName || "Owner unavailable"}</span>
-                  <div className="result-facts">
-                    <span>{result.acreage === null ? "Acres unavailable" : `${displayValue(result.acreage)} acres`}</span>
-                    <span>{result.landUse || "Class unavailable"}</span>
-                    {hint ? <span className="fact-hint">{hint.kind === "out-of-state" ? hint.label : "Mailing differs"}</span> : null}
-                  </div>
-                  <span className="result-apn">{result.apn || result.parcelId || "Parcel ID unavailable"}</span>
+                  <span className="result-number">{index + 1}</span>
+                  <span className="result-main">
+                    <strong className="result-title">{parcelTitle(result)}</strong>
+                    <span className="result-owner">{result.ownerName || "Owner unavailable"}</span>
+                    <span className="result-meta">
+                      <span>{result.sourceCounty || "County unavailable"}</span>
+                      <span>{result.acreage === null ? "Acres unavailable" : `${displayValue(result.acreage)} acres`}</span>
+                      <span>{result.landUse || "Class unavailable"}</span>
+                    </span>
+                    {matchLabel || hint ? (
+                      <span className="result-chips">
+                        {matchLabel ? <span className="match-chip">{matchLabel}</span> : null}
+                        {hint ? (
+                          <span className="hint-chip">{hint.kind === "out-of-state" ? hint.label : "Mailing differs"}</span>
+                        ) : null}
+                      </span>
+                    ) : null}
+                    <span className="result-apn mono">{result.apn || result.parcelId || "Parcel ID unavailable"}</span>
+                  </span>
+                  <Icon name="chevron" size={16} />
                 </button>
               );
             })}
@@ -289,15 +314,12 @@ export default function ParcelExplorer({
           ) : null}
         </section>
       ) : null}
-      {!query.trim() ? (
+      {!trimmed ? (
         <>
           {recent.length > 0 ? (
             <section className="panel-section">
               <div className="section-heading-row">
-                <h3 className="section-title">
-                  <Icon name="clock" size={17} />
-                  Recently viewed
-                </h3>
+                <h3 className="section-title">Recently viewed</h3>
                 <button className="text-button" type="button" onClick={onRecentClear}>
                   Clear
                 </button>
@@ -305,48 +327,37 @@ export default function ParcelExplorer({
               <div className="recent-list">
                 {recent.slice(0, 5).map((p) => (
                   <button key={p.id} onClick={() => onRecentSelect(p)}>
-                    <Icon name="pin" size={17} />
-                    <span>
+                    <span className="recent-icon">
+                      <Icon name="clock" size={16} />
+                    </span>
+                    <span className="recent-text">
                       <strong>{parcelTitle(p)}</strong>
                       <small>{[p.sourceCounty, p.parcelId || p.apn].filter(Boolean).join(" · ")}</small>
                     </span>
-                    <Icon name="chevron" size={15} />
+                    <Icon name="chevron" size={16} />
                   </button>
                 ))}
               </div>
               <p className="panel-note">Saved in this browser only.</p>
             </section>
           ) : null}
-          <section className="panel-section market-section">
-            <div className="section-heading-row">
-              <h3>Jump to a local market</h3>
-              <Icon name="map" size={17} />
-            </div>
-            <div className="market-list">
-              {MARKETS.map((market, i) => (
-                <button key={market.name} onClick={() => onMarketSelect(market.center)}>
-                  <span className={`market-icon market-${i}`}>
-                    <Icon name={i === 3 ? "terrain" : "map"} size={21} />
-                  </span>
-                  <span>
-                    <strong>{market.name}</strong>
-                    <small>{market.description}</small>
-                  </span>
-                  <Icon name="arrow" size={17} />
+          <section className="panel-section">
+            <h3 className="section-title">Jump to a market</h3>
+            <div className="market-grid">
+              {MARKETS.map((market) => (
+                <button key={market.name} className="market-tile" onClick={() => onMarketSelect(market.center)}>
+                  <strong>{market.name}</strong>
+                  <small>{market.description}</small>
                 </button>
               ))}
             </div>
           </section>
-          <section className="explore-tip">
-            <span className="tip-icon">
-              <Icon name="pin" size={21} />
-            </span>
-            <h3>Every parcel has a story.</h3>
+          <section className="panel-section explore-legend">
             <p>
-              Zoom in and select an outlined property to explore its public record, save notes, and build your
-              shortlist.
+              Zoom in and select an outlined property to see its public record, then save it to a project or add it to a
+              comparison.
             </p>
-            <div>
+            <div className="legend-item">
               <span className="legend-line" />
               Approximate parcel boundary
             </div>

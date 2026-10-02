@@ -1,0 +1,482 @@
+/* Shared, reusable UI pieces: buttons, chips, switches, messages, empty and loading states. */
+:root {
+  --icon-hit: 36px;
+}
+
+@media (pointer: coarse) {
+  :root {
+    --icon-hit: 44px;
+  }
+}
+
+/* ---------- Buttons ---------- */
+.primary-button,
+.secondary-button,
+.danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--hit);
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  font-size: var(--fs-base);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  text-decoration: none;
+  user-select: none;
+  transition:
+    background-color var(--dur-1) ease,
+    border-color var(--dur-1) ease,
+    box-shadow var(--dur-1) ease,
+    color var(--dur-1) ease,
+    transform var(--dur-1) ease;
+}
+
+.primary-button {
+  background: var(--brand);
+  color: #fff;
+  box-shadow: var(--shadow-xs), inset 0 1px 0 rgb(255 255 255 / 0.14);
+}
+
+.primary-button:hover:not(:disabled) {
+  background: var(--brand-hover);
+}
+
+.primary-button:active:not(:disabled) {
+  background: var(--g-800);
+  transform: translateY(0.5px);
+}
+
+.primary-button:disabled,
+.danger-button:disabled {
+  background: var(--n-100);
+  color: var(--n-400);
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+.primary-button.saved {
+  background: var(--g-50);
+  color: var(--g-700);
+  border-color: var(--g-200);
+  box-shadow: none;
+}
+
+.primary-button.saved:hover:not(:disabled) {
+  background: var(--g-100);
+}
+
+.secondary-button {
+  background: var(--surface);
+  color: var(--n-800);
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-xs);
+}
+
+.secondary-button:hover:not(:disabled) {
+  background: var(--n-50);
+  border-color: var(--n-300);
+}
+
+.secondary-button:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+
+.secondary-button:disabled {
+  color: var(--n-400);
+  background: var(--n-25);
+  box-shadow: none;
+}
+
+.secondary-button.selected,
+.secondary-button[aria-pressed="true"] {
+  background: var(--g-50);
+  border-color: var(--g-300);
+  color: var(--g-700);
+}
+
+.danger-button {
+  background: var(--danger-600);
+  color: #fff;
+}
+
+.danger-button:hover:not(:disabled) {
+  background: var(--danger-700);
+}
+
+.compact-button {
+  height: 32px;
+  padding: 0 12px;
+  font-size: var(--fs-sm);
+  border-radius: var(--r-sm);
+}
+
+@media (pointer: coarse) {
+  .compact-button {
+    height: 40px;
+  }
+}
+
+.text-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--g-700);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.text-button:hover:not(:disabled) {
+  color: var(--g-900);
+  text-decoration: underline;
+}
+
+.text-button:disabled {
+  color: var(--n-400);
+}
+
+.text-button.danger-text {
+  color: var(--danger-600);
+}
+
+.text-button.danger-text:hover {
+  color: var(--danger-700);
+}
+
+/* Give small text actions a finger-sized hit area without changing layout. */
+@media (pointer: coarse) {
+  .text-button::after {
+    content: "";
+    position: absolute;
+    inset: -10px -6px;
+  }
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: var(--icon-hit);
+  height: var(--icon-hit);
+  border-radius: var(--r-md);
+  color: var(--n-600);
+  flex-shrink: 0;
+  transition:
+    background-color var(--dur-1) ease,
+    color var(--dur-1) ease;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--n-100);
+  color: var(--n-900);
+}
+
+.icon-button:disabled {
+  color: var(--n-300);
+}
+
+.icon-button.bordered {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+}
+
+/* ---------- Chips and badges ---------- */
+.chip,
+.match-chip,
+.hint-chip,
+.saved-chip,
+.count-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: var(--r-full);
+  background: var(--n-100);
+  color: var(--n-700);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.match-chip {
+  border-radius: var(--r-sm);
+  background: var(--info-50);
+  color: var(--info-700);
+  padding: 0 7px;
+  min-height: 22px;
+}
+
+.hint-chip {
+  background: var(--warn-50);
+  color: var(--warn-700);
+  box-shadow: inset 0 0 0 1px var(--warn-200);
+  cursor: help;
+}
+
+.saved-chip {
+  background: var(--g-50);
+  color: var(--g-800);
+  box-shadow: inset 0 0 0 1px var(--g-200);
+  transition: background-color var(--dur-1) ease;
+}
+
+.saved-chip:hover {
+  background: var(--g-100);
+}
+
+.saved-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.count-badge {
+  min-height: 20px;
+  padding: 0 7px;
+  background: var(--g-600);
+  color: #fff;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tag-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.9);
+}
+
+/* ---------- Segmented control ---------- */
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--n-100);
+  border-radius: var(--r-lg);
+}
+
+.segmented > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: calc(var(--hit) - 8px);
+  padding: 0 14px;
+  border-radius: calc(var(--r-lg) - 3px);
+  color: var(--n-600);
+  font-size: var(--fs-sm);
+  font-weight: 550;
+  transition:
+    background-color var(--dur-1) ease,
+    color var(--dur-1) ease,
+    box-shadow var(--dur-1) ease;
+}
+
+.segmented > button:hover:not(.active, [aria-pressed="true"]) {
+  color: var(--n-900);
+}
+
+.segmented > button.active,
+.segmented > button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--n-900);
+  box-shadow: var(--shadow-xs), 0 0 0 1px rgb(19 26 23 / 0.04);
+}
+
+/* ---------- Switch (a styled native checkbox) ---------- */
+.toggle-row input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 42px;
+  height: 26px;
+  margin: 0;
+  border-radius: var(--r-full);
+  background: var(--n-300);
+  cursor: pointer;
+  transition: background-color var(--dur-2) ease;
+}
+
+.toggle-row input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(19 26 23 / 0.28);
+  transition: transform var(--dur-2) var(--ease);
+}
+
+.toggle-row input[type="checkbox"]:checked {
+  background: var(--brand);
+}
+
+.toggle-row input[type="checkbox"]:checked::after {
+  transform: translateX(16px);
+}
+
+.toggle-row input[type="checkbox"]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---------- Messages ---------- */
+.message {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--n-50);
+  color: var(--n-700);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.message.error {
+  background: var(--danger-50);
+  color: var(--danger-700);
+  box-shadow: inset 0 0 0 1px var(--danger-100);
+}
+
+.message.success {
+  background: var(--g-50);
+  color: var(--g-800);
+  box-shadow: inset 0 0 0 1px var(--g-100);
+}
+
+.inline-error {
+  flex-basis: 100%;
+  color: var(--danger-600);
+  font-size: var(--fs-xs);
+}
+
+/* ---------- Empty and loading states ---------- */
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.empty-state > svg {
+  box-sizing: content-box;
+  padding: 14px;
+  margin-bottom: 8px;
+  border-radius: var(--r-xl);
+  background: var(--n-100);
+  color: var(--n-600);
+}
+
+.empty-state h2,
+.empty-state h3 {
+  font-size: var(--fs-md);
+}
+
+.empty-state p {
+  max-width: 30ch;
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+}
+
+.empty-state .primary-button,
+.empty-state .secondary-button,
+.empty-state .text-button {
+  margin-top: 12px;
+}
+
+.loading-results > div {
+  border-radius: var(--r-md);
+  background: linear-gradient(90deg, var(--n-100) 25%, var(--n-50) 45%, var(--n-100) 65%);
+  background-size: 220% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--n-200);
+  border-top-color: var(--g-600);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ---------- Popovers and toasts ---------- */
+.popover {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.workspace-toast {
+  position: absolute;
+  grid-area: map;
+  z-index: var(--z-toast);
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: max-content;
+  max-width: min(440px, calc(100% - 24px));
+  padding: 12px 14px;
+  background: var(--n-900);
+  color: #fff;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-md);
+  animation: toast-in var(--dur-3) var(--ease);
+}
+
+.workspace-toast svg {
+  margin-top: 1px;
+  color: var(--g-300);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+}

@@ -48,9 +48,10 @@ function SavedParcelCard({
       <button className="saved-parcel-main" type="button" onClick={onSelect} disabled={!savedParcel.center}>
         <strong>{parcelTitle(parcel)}</strong>
         <span>{parcel.ownerName || "Owner unavailable"}</span>
-        <span>
-          {fmt(parcel.parcelId || parcel.apn)} · {parcel.acreage === null ? "acres unavailable" : `${fmt(parcel.acreage)} ac`}
-          {savedParcel.createdAt ? ` · saved ${date(savedParcel.createdAt)}` : ""}
+        <span className="saved-parcel-meta">
+          <span className="mono">{fmt(parcel.parcelId || parcel.apn)}</span>
+          <span>{parcel.acreage === null ? "Acres unavailable" : `${fmt(parcel.acreage)} ac`}</span>
+          {savedParcel.createdAt ? <span>Saved {date(savedParcel.createdAt)}</span> : null}
         </span>
       </button>
       {notes[0] && !notesOpen ? <p className="saved-parcel-note">{notes[0].note}</p> : null}
@@ -67,8 +68,9 @@ function SavedParcelCard({
           aria-expanded={notesOpen}
           onClick={() => setNotesOpen(!notesOpen)}
         >
+          <Icon name="note" size={14} />
           {notes.length ? `${notes.length} note${notes.length === 1 ? "" : "s"}` : "No notes"}
-          <Icon name={notesOpen ? "chevronDown" : "chevron"} size={13} />
+          <Icon name={notesOpen ? "chevronUp" : "chevronDown"} size={14} />
         </button>
         <ConfirmAction
           label="Remove"
@@ -123,14 +125,18 @@ function ProjectCard({
   return (
     <details className="saved-project" open={open}>
       <summary>
-        <span>
+        <span className="saved-project-icon">
+          <Icon name="folder" size={18} />
+        </span>
+        <span className="saved-project-text">
           <strong>{project.name}</strong>
           <small>
             {count.toLocaleString()} saved
             {project.clientName ? ` · ${project.clientName}` : ""}
-            {isNextSave ? " · next save" : ""}
           </small>
         </span>
+        {isNextSave ? <span className="chip chip-next">Next save</span> : null}
+        <Icon name="chevronDown" size={18} />
       </summary>
       <div className="project-toolbar">
         {renaming ? (
@@ -179,8 +185,8 @@ function ProjectCard({
         ) : (
           <>
             <button className="text-button" type="button" onClick={onUse} disabled={isNextSave}>
-              <Icon name="folder" size={14} />
-              {isNextSave ? "Next save goes here" : "Use for next save"}
+              <Icon name="bookmarkCheck" size={15} />
+              {isNextSave ? "Saves go here" : "Use for next save"}
             </button>
             <button
               className="text-button"
@@ -191,7 +197,7 @@ function ProjectCard({
                 setRenaming(true);
               }}
             >
-              <Icon name="edit" size={14} /> Rename
+              <Icon name="edit" size={15} /> Rename
             </button>
             {project.visibleParcels.length ? (
               <button
@@ -204,7 +210,7 @@ function ProjectCard({
                   )
                 }
               >
-                <Icon name="download" size={14} /> Export CSV
+                <Icon name="download" size={15} /> Export CSV
               </button>
             ) : null}
             <ConfirmAction
@@ -302,42 +308,58 @@ export default function SavedProjectsSidebar({
 
   return (
     <section className="panel-section saved-projects-panel" aria-labelledby="saved-projects-heading">
-      <div className="section-heading-row">
-        <div>
-          <div className="eyebrow">Your research library</div>
-          <h2 id="saved-projects-heading">Saved projects</h2>
-          {demo ? <p className="panel-note">Demo fallback — changes are not stored.</p> : null}
+      <h3 id="saved-projects-heading" className="sr-only">
+        Saved projects
+      </h3>
+      {demo ? <p className="message">Demo fallback — changes are not stored.</p> : null}
+      <div className="search-row">
+        <div className="search-field">
+          <Icon name="search" size={18} />
+          <label className="sr-only" htmlFor="saved-filter">
+            Filter saved projects and notes
+          </label>
+          <input
+            id="saved-filter"
+            type="text"
+            autoComplete="off"
+            enterKeyHint="search"
+            placeholder="Search projects, properties, notes"
+            value={filter}
+            onChange={(event) => setFilter(event.target.value)}
+          />
+          {filter ? (
+            <button className="icon-button" type="button" aria-label="Clear filter" onClick={() => setFilter("")}>
+              <Icon name="close" size={16} />
+            </button>
+          ) : null}
         </div>
-        <button className="secondary-button compact-button" type="button" onClick={refresh} disabled={loading}>
-          {loading ? "Loading…" : "Refresh"}
+        <button
+          className="icon-button bordered"
+          type="button"
+          onClick={refresh}
+          disabled={loading}
+          aria-label={loading ? "Refreshing saved projects" : "Refresh saved projects"}
+          title="Refresh"
+        >
+          <Icon name="refresh" size={18} className={loading ? "spinning" : undefined} />
         </button>
       </div>
-
-      <p className="panel-note">Properties, notes, and next steps, organized by project.</p>
-      <div className="saved-filter">
-        <label className="sr-only" htmlFor="saved-filter">
-          Filter saved projects and notes
-        </label>
-        <input
-          id="saved-filter"
-          placeholder="Search projects, properties, or notes"
-          value={filter}
-          onChange={(event) => setFilter(event.target.value)}
-        />
-        <label className="sr-only" htmlFor="saved-tag">
-          Filter by workflow tag
-        </label>
-        <span className="tag-select wide">
-          <TagDot tag={tagFilter || null} />
-          <select id="saved-tag" value={tagFilter} onChange={(event) => setTagFilter(event.target.value)}>
-            <option value="">All workflow tags</option>
-            {PARCEL_TAGS.map((tag) => (
-              <option value={tag} key={tag}>
-                {tagLabel(tag)}
-              </option>
-            ))}
-          </select>
-        </span>
+      <div className="tag-filter" role="group" aria-label="Filter by workflow tag">
+        <button type="button" className="tag-chip" aria-pressed={!tagFilter} onClick={() => setTagFilter("")}>
+          All
+        </button>
+        {PARCEL_TAGS.map((tag) => (
+          <button
+            key={tag}
+            type="button"
+            className="tag-chip"
+            aria-pressed={tagFilter === tag}
+            onClick={() => setTagFilter(tagFilter === tag ? "" : tag)}
+          >
+            <TagDot tag={tag} />
+            {tagLabel(tag)}
+          </button>
+        ))}
       </div>
       {loading && projects.length === 0 ? (
         <p className="panel-note" role="status">
@@ -348,8 +370,8 @@ export default function SavedProjectsSidebar({
 
       {!loading && !error && projects.length === 0 ? (
         <div className="empty-state">
-          <Icon name="folder" size={35} />
-          <h3>A place for your next opportunity</h3>
+          <Icon name="folderPlus" size={28} />
+          <h3>No projects yet</h3>
           <p>Select a parcel and choose Save to start your first project.</p>
         </div>
       ) : (

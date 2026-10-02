@@ -1,5 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
+import BrandMark from "@/components/Brand";
 import Icon, { type IconName } from "@/components/Icon";
 import {
   matchKindLabel,
@@ -13,7 +15,7 @@ import {
 import type { AppPanel } from "@/types/measurement";
 import type { ParcelSearchResult } from "@/types/parcel";
 
-export type WorkspacePopover = "layers" | "help" | null;
+export type WorkspacePopover = "layers" | "help" | "account" | null;
 
 const NAV: [AppPanel, string, IconName][] = [
   ["search", "Explore", "search"],
@@ -21,7 +23,7 @@ const NAV: [AppPanel, string, IconName][] = [
   ["saved", "Projects", "folder"],
   ["compare", "Compare", "compare"],
   ["measure", "Measure", "ruler"],
-  ["offline", "Offline", "download"]
+  ["offline", "Offline", "offline"]
 ];
 const TYPEAHEAD_LIMIT = 6;
 
@@ -59,10 +61,11 @@ type Props = {
   onSignOut?: () => void;
   userName: string;
   coordinate: string;
-  status: string;
   error: string | null;
   loading: boolean;
   toast: string;
+  /** Receives the element where the map mounts its zoom/compass control, so it shares the toolbar's look and layout. */
+  onNavHost: (element: HTMLDivElement | null) => void;
 };
 
 function HeaderSearch(p: Props) {
@@ -99,7 +102,7 @@ function HeaderSearch(p: Props) {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
       }}
     >
-      <Icon name="search" size={16} />
+      <Icon name="search" size={18} />
       <label className="sr-only" htmlFor="header-search-input">
         Find a property by address, owner, or parcel ID
       </label>
@@ -111,8 +114,11 @@ function HeaderSearch(p: Props) {
         aria-autocomplete="list"
         aria-activedescendant={showList && active >= 0 ? `header-result-${active}` : undefined}
         autoComplete="off"
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
         maxLength={120}
-        placeholder="Find a property"
+        placeholder="Search address, owner, or parcel ID"
         value={query}
         onFocus={() => setOpen(true)}
         onChange={(event) => {
@@ -150,10 +156,10 @@ function HeaderSearch(p: Props) {
             setActive(-1);
           }}
         >
-          <Icon name="close" size={14} />
+          <Icon name="close" size={16} />
         </button>
       ) : (
-        <kbd>/</kbd>
+        <kbd aria-hidden="true">/</kbd>
       )}
       {showList ? (
         <div className="typeahead-panel">
@@ -195,7 +201,7 @@ function HeaderSearch(p: Props) {
                 : p.searchResults.length
                 ? `See all ${p.searchResults.length} results with filters`
                 : "Open search with filters"}
-              <Icon name="arrow" size={15} />
+              <Icon name="arrow" size={16} />
             </button>
           ) : null}
         </div>
@@ -205,137 +211,187 @@ function HeaderSearch(p: Props) {
 }
 
 export default function WorkspaceChrome(p: Props) {
+  const { onNavHost } = p;
   const layersOpen = p.openPopover === "layers";
   const helpOpen = p.openPopover === "help";
+  const accountOpen = p.openPopover === "account";
   const togglePopover = (popover: Exclude<WorkspacePopover, null>) =>
     p.onPopoverChange(p.openPopover === popover ? null : popover);
+  const measuring = p.panel === "measure";
+  const initial = (p.userName.trim().slice(0, 1) || "P").toUpperCase();
+
   function openSearchPanel() {
-    p.onPanel("search");
-    setTimeout(() => document.getElementById("parcel-search")?.focus(), 50);
+    // Render the panel synchronously so the input can be focused inside this tap. iOS only
+    // raises the keyboard for focus() calls made during the user's gesture.
+    flushSync(() => p.onPanel("search"));
+    document.getElementById("parcel-search")?.focus();
   }
+
+  useEffect(() => {
+    if (!accountOpen) return;
+    const close = (event: PointerEvent) => {
+      if (!(event.target as Element | null)?.closest(".header-account")) p.onPopoverChange(null);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the open state matters
+  }, [accountOpen]);
+
   return (
     <>
-      <header className="workspace-header">
+      <header className="app-header">
+        <h1 className="sr-only">Parcel realtor workspace</h1>
         <button className="brand" onClick={p.onHome} aria-label="Parcel home map">
-          <span className="brand-mark">
-            <Icon name="layers" size={25} />
-          </span>
-          <span>
-            parcel<span className="brand-period">.</span>
-            <small>REALTOR WORKSPACE</small>
-          </span>
+          <BrandMark />
+          <span className="brand-name">Parcel</span>
         </button>
-        <div className="header-divider" />
         <span className="workspace-region">
-          <Icon name="pin" size={16} />
+          <Icon name="pin" size={14} />
           Upper Peninsula, MI
         </span>
         <HeaderSearch {...p} />
-        <button className="header-search" aria-label="Find a property" onClick={openSearchPanel}>
-          <Icon name="search" size={16} />
+        <button className="header-search-pill" aria-label="Find a property" onClick={openSearchPanel}>
+          <Icon name="search" size={18} />
+          <span>Search address, owner, APN</span>
         </button>
         <div className="header-account">
-          <span className={`connection-status ${p.online ? "" : "offline"}`}>
-            <span className="status-dot" />
-            {p.online ? "Online" : "Offline"}
-          </span>
-          <span className="user-avatar" title={p.userName}>
-            {p.userName.slice(0, 1).toUpperCase()}
-          </span>
-          {p.onSignOut ? (
-            <button className="icon-button" onClick={p.onSignOut} title="Sign out" aria-label="Sign out">
-              <Icon name="logout" size={17} />
-            </button>
+          {!p.online ? (
+            <span className="connection-status" role="status">
+              <span className="status-dot" />
+              <span>Offline</span>
+            </span>
           ) : null}
+          {p.onSignOut ? (
+            <>
+              <button
+                className="avatar-button"
+                aria-label="Account menu"
+                aria-haspopup="menu"
+                aria-expanded={accountOpen}
+                onClick={() => togglePopover("account")}
+              >
+                {initial}
+              </button>
+              {accountOpen ? (
+                <div className="account-menu popover" role="menu" aria-label="Account">
+                  <div className="account-menu-who">
+                    <strong>{p.userName}</strong>
+                    <span>Signed in</span>
+                  </div>
+                  <button className="menu-item" role="menuitem" onClick={p.onSignOut}>
+                    <Icon name="logout" size={17} />
+                    Sign out
+                  </button>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <span className="avatar-button" title={p.userName}>
+              {initial}
+            </span>
+          )}
         </div>
       </header>
-      <nav className="workspace-rail" aria-label="Workspace navigation">
+
+      <nav className="app-nav" aria-label="Workspace navigation">
         {NAV.map(([panel, label, icon]) => (
           <button
             key={panel}
-            className={p.panel === panel ? "rail-button active" : "rail-button"}
+            className={p.panel === panel ? "nav-item active" : "nav-item"}
             aria-pressed={p.panel === panel}
             onClick={() => p.onPanel(p.panel === panel ? "map" : panel)}
             title={label}
           >
-            <Icon name={icon} size={21} />
+            <Icon name={icon} size={22} />
             <span>{label}</span>
-            {panel === "compare" && p.compareCount > 0 ? <b>{p.compareCount}</b> : null}
+            {panel === "compare" && p.compareCount > 0 ? (
+              <span className="nav-badge" aria-label={`${p.compareCount} in comparison`}>
+                {p.compareCount}
+              </span>
+            ) : null}
           </button>
         ))}
+        <span className="nav-spacer" />
         <button
-          className="rail-help"
+          className="nav-item nav-guide"
           onClick={() => togglePopover("help")}
           aria-expanded={helpOpen}
           aria-label="Map help and keyboard shortcuts"
+          title="Guide"
         >
-          <Icon name="book" size={20} />
+          <Icon name="book" size={22} />
           <span>Guide</span>
         </button>
       </nav>
-      <div className="map-toolbar">
-        <div className="map-mode-switch" role="group" aria-label="Basemap">
+
+      <div className="map-ui map-ui--tl" role="region" aria-label="Basemap controls">
+        <div className="segmented basemap-switch" role="group" aria-label="Basemap">
           <button
             className={p.basemap === "streets" ? "active" : ""}
             onClick={() => p.onBasemap("streets")}
             aria-pressed={p.basemap === "streets"}
           >
-            <Icon name="map" size={17} />
-            Topo map
+            Map
           </button>
           <button
             className={p.basemap === "satellite" ? "active" : ""}
             onClick={() => p.onBasemap("satellite")}
             aria-pressed={p.basemap === "satellite"}
           >
-            <Icon name="terrain" size={17} />
             Satellite
           </button>
         </div>
-        <div className="map-toolbar-actions">
+      </div>
+
+      <div className="map-ui map-ui--tr" role="region" aria-label="Map controls">
+        <div className="map-btn-group" role="group" aria-label="Map tools">
           <button
-            className={p.locating ? "map-tool active" : "map-tool"}
+            className="map-btn"
+            aria-label="Map layers"
+            title="Layers"
+            aria-expanded={layersOpen}
+            onClick={() => togglePopover("layers")}
+          >
+            <Icon name="layers" size={20} />
+          </button>
+          <button
+            className={p.locating ? "map-btn busy" : "map-btn"}
             aria-label="Find the parcel at my location"
             title="What parcel am I on?"
             disabled={p.locating}
             onClick={p.onLocate}
           >
-            <Icon name="locate" size={17} />
-            <span>{p.locating ? "Locating…" : "Locate"}</span>
+            <Icon name="locate" size={20} />
+          </button>
+          <button className="map-btn" aria-label="Copy link to this map view" title="Copy map link" onClick={p.onShare}>
+            <Icon name="link" size={19} />
           </button>
           <button
-            className={layersOpen ? "map-tool active" : "map-tool"}
-            aria-label="Map layers"
-            aria-expanded={layersOpen}
-            onClick={() => togglePopover("layers")}
+            className="map-btn map-tool-desktop"
+            onClick={p.onHome}
+            aria-label="Reset map to Houghton"
+            title="Home market"
           >
-            <Icon name="layers" size={17} />
-            <span>Layers</span>
+            <Icon name="home" size={19} />
           </button>
           <button
-            className="map-tool icon-button"
-            aria-label="Copy link to this map view"
-            title="Copy map link"
-            onClick={p.onShare}
-          >
-            <Icon name="link" size={18} />
-          </button>
-          <button
-            className="map-tool icon-button fullscreen-tool"
+            className="map-btn map-tool-desktop"
             aria-label="Toggle fullscreen"
             title="Fullscreen"
             onClick={p.onFullscreen}
           >
-            <Icon name="expand" size={18} />
+            <Icon name="expand" size={19} />
           </button>
         </div>
+        <div ref={onNavHost} className="map-nav-host" />
       </div>
+
       {layersOpen ? (
         <section className="layers-popover" aria-label="Map layers">
-          <div className="section-heading-row">
-            <h3>Map layers</h3>
+          <div className="popover-head">
+            <h2>Map layers</h2>
             <button className="icon-button" onClick={() => p.onPopoverChange(null)} aria-label="Close map layers">
-              <Icon name="close" size={17} />
+              <Icon name="close" size={18} />
             </button>
           </div>
           <label className="toggle-row">
@@ -371,7 +427,9 @@ export default function WorkspaceChrome(p: Props) {
             />
           </label>
           <label className="opacity-control">
-            Parcel fill <span>{p.opacity}%</span>
+            <span>
+              Parcel fill <span>{p.opacity}%</span>
+            </span>
             <input
               aria-label="Parcel fill opacity"
               type="range"
@@ -383,50 +441,55 @@ export default function WorkspaceChrome(p: Props) {
           </label>
           <div className="layer-legend">
             <span>
-              <i style={{ borderColor: p.basemap === "satellite" ? "#ff7a00" : "#1d4ed8" }} />
+              <i className={p.basemap === "satellite" ? "swatch-satellite" : "swatch-streets"} />
               Parcel outline
             </span>
             <span>
               <i className="selected-legend" />
               Selected property
             </span>
-            {PARCEL_TAGS.map((tag) => (
-              <span key={tag}>
-                <i className="tag-legend" style={{ background: TAG_COLORS[tag] }} />
-                Saved · {tagLabel(tag)}
-              </span>
-            ))}
+            <div className="legend-tags" role="group" aria-label="Saved parcel colors by tag">
+              {PARCEL_TAGS.map((tag) => (
+                <span key={tag}>
+                  <i className="tag-legend" style={{ background: TAG_COLORS[tag] }} />
+                  Saved · {tagLabel(tag)}
+                </span>
+              ))}
+            </div>
           </div>
           <p className="panel-note">Map settings are remembered in this browser.</p>
         </section>
       ) : null}
-      <button
-        className="map-home map-tool icon-button"
-        onClick={p.onHome}
-        aria-label="Reset map to Houghton"
-        title="Home market"
-      >
-        <Icon name="home" size={19} />
-      </button>
-      <div className="map-readout">
-        <div className="map-status" role="status">
-          <span className={p.loading ? "loading-dot" : "status-dot"} />
-          {p.error || p.status}
+
+      {p.loading ? <div className="map-progress" role="progressbar" aria-label="Loading parcels" /> : null}
+      {p.error ? (
+        <div className="map-banner error" role="alert">
+          <Icon name="alert" size={16} />
+          {p.error}
         </div>
-        <span className="coordinate-readout">{p.coordinate}</span>
-      </div>
+      ) : measuring ? (
+        <div className="map-banner mode" role="status">
+          <Icon name="ruler" size={16} />
+          Measuring · tap the map to add points
+        </div>
+      ) : null}
+      <span className="coordinate-readout" aria-hidden="true">
+        {p.coordinate}
+      </span>
+
       {p.toast ? (
         <div className="workspace-toast" role="status">
           <Icon name="info" size={18} />
           {p.toast}
         </div>
       ) : null}
+
       {helpOpen ? (
         <section className="help-popover" aria-label="Workspace guide">
-          <div className="section-heading-row">
-            <h3>Your field guide</h3>
+          <div className="popover-head">
+            <h2>Shortcuts &amp; tips</h2>
             <button className="icon-button" aria-label="Close guide" onClick={() => p.onPopoverChange(null)}>
-              <Icon name="close" size={17} />
+              <Icon name="close" size={18} />
             </button>
           </div>
           <p>
@@ -462,10 +525,13 @@ export default function WorkspaceChrome(p: Props) {
           <p>Offline areas save parcel records in this browser. Background maps may still require internet access.</p>
         </section>
       ) : null}
-      <footer className="workspace-footer">
-        <Icon name="shield" size={15} />
-        <span className="disclaimer-full">{PARCEL_DISCLAIMER}</span>
-        <span className="disclaimer-short">{PARCEL_DISCLAIMER_SHORT}</span>
+
+      <footer className="app-footer">
+        <Icon name="info" size={15} />
+        <p>
+          <span className="disclaimer-full">{PARCEL_DISCLAIMER}</span>
+          <span className="disclaimer-short">{PARCEL_DISCLAIMER_SHORT}</span>
+        </p>
       </footer>
     </>
   );

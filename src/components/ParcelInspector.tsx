@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import BrandMark from "@/components/Brand";
 import Icon from "@/components/Icon";
 import ParcelOutline from "@/components/ParcelOutline";
 import ParcelMeasurements from "@/components/ParcelMeasurements";
@@ -57,59 +58,62 @@ function SaveMenu({
   const ref = useRef<HTMLDivElement>(null);
   const [newName, setNewName] = useState("");
   useEffect(() => {
-    const close = (event: MouseEvent) => {
+    const close = (event: PointerEvent) => {
       if (ref.current && !ref.current.contains(event.target as Node)) onClose();
     };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
   }, [onClose]);
   return (
-    <div
-      ref={ref}
-      className="save-menu"
-      role="dialog"
-      aria-label="Save to a project"
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.stopPropagation();
-          onClose();
-        }
-      }}
-    >
-      <strong>Save to project</strong>
-      {projectNames.length ? (
-        <div className="save-menu-list">
-          {projectNames.map((name) => (
-            <button key={name} type="button" disabled={saving} onClick={() => onSave(name)}>
-              <Icon name={savedProjectNames.has(name) ? "check" : "folder"} size={15} />
-              <span>{name}</span>
-            </button>
-          ))}
-        </div>
-      ) : null}
-      <form
-        className="save-menu-new"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (newName.trim()) onSave(newName.trim());
+    <>
+      <div className="menu-backdrop" aria-hidden="true" />
+      <div
+        ref={ref}
+        className="save-menu popover"
+        role="dialog"
+        aria-label="Save to a project"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            onClose();
+          }
         }}
       >
-        <label htmlFor="save-menu-new-project">New project</label>
-        <div>
-          <input
-            id="save-menu-new-project"
-            value={newName}
-            maxLength={120}
-            autoFocus={!projectNames.length}
-            placeholder="e.g. Lakefront buyer search"
-            onChange={(event) => setNewName(event.target.value)}
-          />
-          <button className="primary-button compact-button" disabled={saving || !newName.trim()}>
-            Create
-          </button>
-        </div>
-      </form>
-    </div>
+        <strong>Save to project</strong>
+        {projectNames.length ? (
+          <div className="save-menu-list">
+            {projectNames.map((name) => (
+              <button key={name} type="button" disabled={saving} onClick={() => onSave(name)}>
+                <Icon name={savedProjectNames.has(name) ? "check" : "folder"} size={16} />
+                <span>{name}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <form
+          className="save-menu-new"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (newName.trim()) onSave(newName.trim());
+          }}
+        >
+          <label htmlFor="save-menu-new-project">New project</label>
+          <div>
+            <input
+              id="save-menu-new-project"
+              value={newName}
+              maxLength={120}
+              autoFocus={!projectNames.length}
+              placeholder="e.g. Lakefront buyer search"
+              onChange={(event) => setNewName(event.target.value)}
+            />
+            <button className="primary-button compact-button" disabled={saving || !newName.trim()}>
+              Create
+            </button>
+          </div>
+        </form>
+      </div>
+    </>
   );
 }
 
@@ -117,13 +121,14 @@ function SavedActivity({ entries, onChanged }: { entries: SavedEntry[]; onChange
   if (!entries.length) return null;
   return (
     <div className="saved-activity">
-      <h3 className="section-title">
-        <Icon name="folder" size={17} /> Saved in {entries.length === 1 ? "1 project" : `${entries.length} projects`}
-      </h3>
+      <h3 className="section-title">Saved in {entries.length === 1 ? "1 project" : `${entries.length} projects`}</h3>
       {entries.map(({ project, saved }) => (
         <article key={saved.id} className="saved-entry">
           <div className="saved-entry-head">
-            <strong>{project.name}</strong>
+            <strong>
+              <Icon name="folder" size={16} />
+              {project.name}
+            </strong>
             <TagSelect key={saved.tag ?? ""} savedParcelId={saved.id} tag={saved.tag} onChanged={onChanged} />
           </div>
           {saved.notes.length ? (
@@ -220,13 +225,16 @@ export default function ParcelInspector({
 
   const brief = (
     <article className="print-brief">
-      <div className="print-brand">PARCEL / Property brief</div>
+      <div className="print-brand">
+        <BrandMark size={22} className="print-mark" />
+        <span>Parcel · Property brief</span>
+      </div>
       <h1>{parcelTitle(p)}</h1>
       <p>
         Prepared {new Date().toLocaleDateString()} · {p.sourceCounty}, {p.state}
       </p>
       <ParcelOutline parcel={parcel} />
-      <ParcelMeasurements measurements={measurements} />
+      <ParcelMeasurements measurements={measurements} variant="print" />
       <dl className="record-list">
         {[
           ["Parcel ID", p.parcelId],
@@ -248,7 +256,7 @@ export default function ParcelInspector({
           </div>
         ))}
       </dl>
-      <p>{PARCEL_DISCLAIMER}</p>
+      <p className="print-disclaimer">{PARCEL_DISCLAIMER}</p>
     </article>
   );
 
@@ -257,62 +265,24 @@ export default function ParcelInspector({
   return (
     <>
       <section className="parcel-hero panel-section">
-        <div className="eyebrow">
-          <span className="status-dot" /> Selected property{" "}
-          <span className="county-chip">
+        <h3 className="hero-title">{parcelTitle(p)}</h3>
+        <div className="hero-meta">
+          <span>
             {p.sourceCounty || "County unavailable"}
             {p.state ? `, ${p.state}` : ""}
           </span>
+          <button className="parcel-id-copy" onClick={copyId} title="Copy parcel ID">
+            <span className="mono">{p.parcelId || p.apn || "Parcel ID unavailable"}</span>
+            <Icon name="copy" size={14} />
+          </button>
         </div>
-        <h2>{parcelTitle(p)}</h2>
-        <button className="parcel-id-copy" onClick={copyId} title="Copy parcel ID">
-          {p.parcelId || p.apn || "Parcel ID unavailable"}
-          <Icon name="copy" size={14} />
-        </button>
-        {entries.length || mailingHint ? (
-          <div className="parcel-badges">
-            {entries.map(({ project, saved: savedParcel }) => (
-              <button
-                key={savedParcel.id}
-                type="button"
-                className="saved-chip"
-                onClick={() => setTab("notes")}
-                title="Show saved details and notes"
-              >
-                <TagDot tag={savedParcel.tag} />
-                <span>
-                  Saved in <b>{project.name}</b> · {tagLabel(savedParcel.tag)}
-                </span>
-              </button>
-            ))}
-            {mailingHint ? (
-              <span className="hint-chip" title={MAILING_HINT_NOTE}>
-                <Icon name="info" size={14} />
-                {mailingHint.label}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-        <div className="parcel-summary">
-          <ParcelOutline parcel={parcel} />
-          <div className="hero-facts">
-            <span>Recorded acreage</span>
-            <strong>
-              {p.acreage === null ? "—" : displayValue(p.acreage)}{" "}
-              <small>{p.acreage === null ? "unavailable" : "acres"}</small>
-            </strong>
-            <span>Assessed value</span>
-            <b>{displayMoney(p.assessedValue)}</b>
-            <small>Assessment, not market value</small>
-          </div>
-        </div>
-        <ParcelMeasurements measurements={measurements} />
+
         <div className="parcel-actions">
           <div className="split-button">
             {currentEntry ? (
               <button className="primary-button saved" onClick={() => setTab("notes")} title={`Saved in ${saveTarget}`}>
-                <Icon name="check" size={17} />
-                <span>Saved in {saveTarget}</span>
+                <Icon name="bookmarkCheck" size={17} />
+                <span>Saved</span>
               </button>
             ) : (
               <button
@@ -321,7 +291,7 @@ export default function ParcelInspector({
                 onClick={() => void save()}
                 title={`Save to ${saveTarget}`}
               >
-                <Icon name="folder" size={17} />
+                <Icon name="bookmark" size={17} />
                 <span>{saving ? "Saving…" : `Save to ${saveTarget}`}</span>
               </button>
             )}
@@ -331,7 +301,7 @@ export default function ParcelInspector({
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen(!menuOpen)}
             >
-              <Icon name="chevronDown" size={16} />
+              <Icon name="chevronDown" size={17} />
             </button>
             {menuOpen ? (
               <SaveMenu
@@ -349,10 +319,15 @@ export default function ParcelInspector({
             aria-pressed={compared}
           >
             <Icon name={compared ? "check" : "compare"} size={17} />
-            {compared ? "Added" : "Compare"}
+            <span className="btn-label">{compared ? "Added" : "Compare"}</span>
           </button>
-          <button className="icon-button" onClick={onFocus} title="Fit parcel on map" aria-label="Fit parcel on map">
-            <Icon name="target" size={18} />
+          <button
+            className="icon-button bordered"
+            onClick={onFocus}
+            title="Fit parcel on map"
+            aria-label="Fit parcel on map"
+          >
+            <Icon name="target" size={19} />
           </button>
         </div>
         {message ? (
@@ -365,8 +340,52 @@ export default function ParcelInspector({
             {error}
           </p>
         ) : null}
+
+        {entries.length || mailingHint ? (
+          <div className="parcel-badges">
+            {entries.map(({ project, saved: savedParcel }) => (
+              <button
+                key={savedParcel.id}
+                type="button"
+                className="saved-chip"
+                onClick={() => setTab("notes")}
+                title="Show saved details and notes"
+              >
+                <TagDot tag={savedParcel.tag} />
+                <span>
+                  {project.name} · {tagLabel(savedParcel.tag)}
+                </span>
+              </button>
+            ))}
+            {mailingHint ? (
+              <span className="hint-chip" title={MAILING_HINT_NOTE}>
+                <Icon name="info" size={14} />
+                {mailingHint.label}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="parcel-summary">
+          <ParcelOutline parcel={parcel} />
+          <dl className="hero-facts">
+            <div>
+              <dt>Recorded acreage</dt>
+              <dd className="stat">
+                {p.acreage === null ? "—" : displayValue(p.acreage)}
+                <small>{p.acreage === null ? "unavailable" : "acres"}</small>
+              </dd>
+            </div>
+            <div>
+              <dt>Assessed value</dt>
+              <dd className="stat">{displayMoney(p.assessedValue)}</dd>
+              <dd className="stat-note">Assessment, not market value</dd>
+            </div>
+          </dl>
+        </div>
       </section>
-      <div className="inspector-tabs" role="tablist" aria-label="Property information">
+
+      <div className="tabs" role="tablist" aria-label="Property information">
         {(
           [
             ["overview", "Overview"],
@@ -397,16 +416,14 @@ export default function ParcelInspector({
         ))}
       </div>
       <section
-        className="panel-section"
+        className="panel-section tab-panel"
         role="tabpanel"
         id={`parcel-panel-${tab}`}
         aria-labelledby={`parcel-tab-${tab}`}
       >
         {tab === "overview" ? (
           <>
-            <h3 className="section-title">
-              <Icon name="home" size={17} /> Property record
-            </h3>
+            <h3 className="section-title">Property record</h3>
             <dl className="record-list">
               {[
                 ["Owner of record", p.ownerName],
@@ -417,7 +434,7 @@ export default function ParcelInspector({
               ].map(([label, value]) => (
                 <div key={label}>
                   <dt>{label}</dt>
-                  <dd>{displayValue(value)}</dd>
+                  <dd className={label === "APN" ? "mono" : undefined}>{displayValue(value)}</dd>
                   {label === "Mailing address" && mailingHint ? (
                     <dd className="record-hint">
                       <strong>{mailingHint.label}.</strong> {MAILING_HINT_NOTE}
@@ -433,19 +450,20 @@ export default function ParcelInspector({
               </summary>
               <p>{p.legalDescription || "Not available from source"}</p>
             </details>
+            <ParcelMeasurements measurements={measurements} />
             <div className="export-actions">
               <button className="secondary-button" ref={printTriggerRef} onClick={() => setPrintPreview(true)}>
-                <Icon name="print" size={16} /> Print brief
+                <Icon name="print" size={17} /> Print brief
               </button>
               <button className="secondary-button" onClick={() => downloadParcelsCsv([p])}>
-                <Icon name="download" size={16} /> Export CSV
+                <Icon name="download" size={17} /> Export CSV
               </button>
             </div>
           </>
         ) : null}
         {tab === "notes" ? (
           <>
-            <h3>Organize this property</h3>
+            <h3 className="section-title">Organize this property</h3>
             <p className="panel-note">
               Save to a client or research project. Unsaved notes stay in this session while you switch tools. Save to
               keep them in your project.
@@ -490,19 +508,21 @@ export default function ParcelInspector({
               ) : null}
               <fieldset className="tag-picker">
                 <legend>Workflow tag</legend>
-                {PARCEL_TAGS.map((value) => (
-                  <button
-                    type="button"
-                    key={value}
-                    disabled={saving}
-                    aria-pressed={tag === value}
-                    className={tag === value ? "tag active" : "tag"}
-                    onClick={() => setTag(value)}
-                  >
-                    <TagDot tag={value} />
-                    {tagLabel(value)}
-                  </button>
-                ))}
+                <div>
+                  {PARCEL_TAGS.map((value) => (
+                    <button
+                      type="button"
+                      key={value}
+                      disabled={saving}
+                      aria-pressed={tag === value}
+                      className={tag === value ? "tag active" : "tag"}
+                      onClick={() => setTag(value)}
+                    >
+                      <TagDot tag={value} />
+                      {tagLabel(value)}
+                    </button>
+                  ))}
+                </div>
               </fieldset>
               <label>
                 Private note
@@ -516,7 +536,7 @@ export default function ParcelInspector({
                 {note.length > 1800 ? <small className="char-count">{note.length.toLocaleString()} / 2,000</small> : null}
               </label>
               <button className="primary-button" disabled={saving || !projectName.trim()}>
-                <Icon name="folder" size={17} />
+                <Icon name="bookmark" size={17} />
                 {saving ? "Saving…" : currentEntry ? "Update saved property" : "Save to project"}
               </button>
             </form>
@@ -525,9 +545,7 @@ export default function ParcelInspector({
         ) : null}
         {tab === "source" ? (
           <>
-            <h3 className="section-title">
-              <Icon name="shield" size={18} /> Data provenance
-            </h3>
+            <h3 className="section-title">Data provenance</h3>
             <dl className="record-list">
               {[
                 ["Provider", p.provider],
@@ -556,7 +574,7 @@ export default function ParcelInspector({
         ) : null}
       </section>
       <p className="verification-note">
-        <Icon name="info" size={17} />
+        <Icon name="info" size={16} />
         Verify public-record information with the county or municipality before relying on it for a transaction.
       </p>
       {printPreview
@@ -571,7 +589,7 @@ export default function ParcelInspector({
                 <strong>Property brief preview</strong>
                 <div className="button-row">
                   <button className="primary-button" onClick={() => window.print()}>
-                    <Icon name="print" size={16} />
+                    <Icon name="print" size={17} />
                     Print / Save PDF
                   </button>
                   <button
@@ -579,7 +597,7 @@ export default function ParcelInspector({
                     aria-label="Close property brief preview"
                     onClick={() => setPrintPreview(false)}
                   >
-                    <Icon name="close" size={19} />
+                    <Icon name="close" size={20} />
                   </button>
                 </div>
               </div>

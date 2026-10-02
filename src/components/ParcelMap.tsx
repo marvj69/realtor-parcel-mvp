@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import type * as MapLibre from "maplibre-gl";
 import type MapLibreDefault from "maplibre-gl";
 
@@ -17,7 +17,11 @@ import type { Feature, FeatureCollection, Geometry, MultiPolygon, Polygon, Posit
 import WorkspaceChrome, { type WorkspacePopover } from "@/components/WorkspaceChrome";
 import ParcelDetails from "@/components/ParcelDetails";
 import Icon from "@/components/Icon";
+import BrandMark from "@/components/Brand";
+import Contours from "@/components/Contours";
 import { readStored, STORAGE_KEYS, writeStored } from "@/lib/browser-prefs";
+import { currentLayoutMode, useLayoutMode } from "@/lib/layout-mode";
+import { MAP_THEME } from "@/lib/map-theme";
 import { formatAddress, parcelTitle, tagColor } from "@/lib/parcel-presentation";
 import { useSavedProjects } from "@/lib/saved-work-client";
 import {
@@ -85,12 +89,8 @@ const MEASUREMENT_SOURCE_ID = "measurements";
 const MEASUREMENT_FILL_LAYER_ID = "measurement-fill";
 const MEASUREMENT_LINE_LAYER_ID = "measurement-line";
 const MEASUREMENT_POINT_LAYER_ID = "measurement-points";
-const STREET_PARCEL_LINE_COLOR = "#1d4ed8";
-const SATELLITE_PARCEL_LINE_COLOR = "#ff7a00";
-const STREET_SELECTED_PARCEL_LINE_COLOR = "#ea580c";
-const SATELLITE_SELECTED_PARCEL_LINE_COLOR = "#ff9f1c";
-const STREET_HOVER_LINE_COLOR = "#1e3a8a";
-const SATELLITE_HOVER_LINE_COLOR = "#ffffff";
+const PARCEL_TILE_CASING_LAYER_ID = "parcel-tile-casing";
+const SELECTED_PARCEL_CASING_LAYER_ID = "selected-parcel-casing";
 const OPENFREEMAP_STYLE_PREFIX = "https://tiles.openfreemap.org/styles/";
 const DEFAULT_STREET_TILE_URL =
   "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}";
@@ -182,11 +182,21 @@ function savedParcelCollection(savedParcels: SavedParcelSummary[]) {
 type MapStyleConfig = string | MapLibre.StyleSpecification;
 type LayerVisibility = "visible" | "none";
 type LayerVisibilityById = Record<string, LayerVisibility>;
-type NumberInterpolateExpression = ["interpolate", ["linear"], ["zoom"], number, number, number, number];
 type SelectableParcelSource = "live" | "offline";
 
-function getStreetParcelTileLineOpacity(minZoom: number): NumberInterpolateExpression {
-  return ["interpolate", ["linear"], ["zoom"], minZoom, 0.45, 16, 0.8];
+/** Zoom-dependent value: calm at the first parcel zoom, full strength four levels closer. */
+function zoomRamp(minZoom: number, values: [number, number, number]): MapLibre.ExpressionSpecification {
+  return [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    minZoom,
+    values[0],
+    minZoom + 2,
+    values[1],
+    minZoom + 4,
+    values[2]
+  ];
 }
 
 function configureMapPerformance() {
@@ -194,33 +204,51 @@ function configureMapPerformance() {
   maplibregl.setWorkerCount(Math.min(Math.max(2, Math.floor(availableCores / 2)), MAPLIBRE_WORKER_LIMIT));
 }
 
-function setParcelBoundaryPaint(map: MapLibre.Map, basemapMode: BasemapMode, minZoom: number) {
-  const isSatellite = basemapMode === "satellite";
-  const parcelLineColor = isSatellite ? SATELLITE_PARCEL_LINE_COLOR : STREET_PARCEL_LINE_COLOR;
-  const selectedLineColor = isSatellite ? SATELLITE_SELECTED_PARCEL_LINE_COLOR : STREET_SELECTED_PARCEL_LINE_COLOR;
+/**
+ * Every parcel color, width and opacity is set here, so a basemap or preference change can never leave
+ * layers disagreeing. Outlines stay faint at the first parcel zoom and sharpen as you zoom in, which keeps
+ * dense towns readable instead of a solid mesh of lines.
+ */
+function paintParcelLayers(
+  map: MapLibre.Map,
+  mode: BasemapMode,
+  prefs: { boundaries: boolean; fillOpacity: number },
+  minZoom: number
+) {
+  const satellite = mode === "satellite";
+  const theme = satellite ? MAP_THEME.satellite : MAP_THEME.streets;
+  const show = prefs.boundaries;
+  const fill = prefs.fillOpacity / 100;
+  const set = (layerId: string, paint: Record<string, unknown>) => {
+    if (!map.getLayer(layerId)) return;
+    for (const [property, value] of Object.entries(paint)) map.setPaintProperty(layerId, property, value as never);
+  };
 
-  if (map.getLayer(PARCEL_TILE_LINE_LAYER_ID)) {
-    map.setPaintProperty(PARCEL_TILE_LINE_LAYER_ID, "line-color", parcelLineColor);
-    map.setPaintProperty(
-      PARCEL_TILE_LINE_LAYER_ID,
-      "line-opacity",
-      isSatellite ? 0.95 : getStreetParcelTileLineOpacity(minZoom)
-    );
-  }
+  const lineOpacity = show ? zoomRamp(minZoom, satellite ? [0.5, 0.8, 0.95] : [0.4, 0.65, 0.92]) : 0;
+  const lineWidth = zoomRamp(minZoom, satellite ? [0.7, 1, 1.5] : [0.55, 0.9, 1.4]);
+  const tileFill = show ? zoomRamp(minZoom, [0, fill / 2, fill]) : 0;
 
-  if (map.getLayer(PARCEL_GEOJSON_LINE_LAYER_ID)) {
-    map.setPaintProperty(PARCEL_GEOJSON_LINE_LAYER_ID, "line-color", parcelLineColor);
-    map.setPaintProperty(PARCEL_GEOJSON_LINE_LAYER_ID, "line-opacity", isSatellite ? 0.95 : 0.65);
+  set(PARCEL_TILE_FILL_LAYER_ID, { "fill-color": theme.fill, "fill-opacity": tileFill });
+  set(PARCEL_TILE_LINE_LAYER_ID, { "line-color": theme.line, "line-opacity": lineOpacity, "line-width": lineWidth });
+  set(PARCEL_TILE_CASING_LAYER_ID, {
+    "line-color": theme.casing,
+    "line-opacity": show ? zoomRamp(minZoom, [0.22, 0.32, 0.4]) : 0,
+    "line-width": zoomRamp(minZoom, [1.8, 2.4, 3.2])
+  });
+  set(PARCEL_GEOJSON_FILL_LAYER_ID, { "fill-color": theme.fill, "fill-opacity": show ? fill : 0 });
+  set(PARCEL_GEOJSON_LINE_LAYER_ID, {
+    "line-color": theme.line,
+    "line-opacity": show ? (satellite ? 0.9 : 0.75) : 0,
+    "line-width": satellite ? 1.2 : 1
+  });
+  set(OFFLINE_PARCEL_FILL_LAYER_ID, { "fill-color": MAP_THEME.offline.fill, "fill-opacity": show ? fill : 0 });
+  set(OFFLINE_PARCEL_LINE_LAYER_ID, { "line-color": MAP_THEME.offline.line, "line-opacity": show ? 0.9 : 0 });
+  for (const layerId of [PARCEL_TILE_HOVER_LAYER_ID, PARCEL_GEOJSON_HOVER_LAYER_ID, OFFLINE_PARCEL_HOVER_LAYER_ID]) {
+    set(layerId, { "line-color": layerId === OFFLINE_PARCEL_HOVER_LAYER_ID ? MAP_THEME.offline.line : theme.hover });
   }
-
-  if (map.getLayer(SELECTED_PARCEL_LINE_LAYER_ID)) {
-    map.setPaintProperty(SELECTED_PARCEL_LINE_LAYER_ID, "line-color", selectedLineColor);
-  }
-
-  for (const layerId of [PARCEL_TILE_HOVER_LAYER_ID, PARCEL_GEOJSON_HOVER_LAYER_ID]) {
-    if (map.getLayer(layerId))
-      map.setPaintProperty(layerId, "line-color", isSatellite ? SATELLITE_HOVER_LINE_COLOR : STREET_HOVER_LINE_COLOR);
-  }
+  set("selected-parcel-fill", { "fill-color": theme.selectedFill, "fill-opacity": satellite ? 0.3 : 0.22 });
+  set(SELECTED_PARCEL_CASING_LAYER_ID, { "line-color": theme.casing, "line-opacity": satellite ? 0.6 : 0.95 });
+  set(SELECTED_PARCEL_LINE_LAYER_ID, { "line-color": theme.selected });
 }
 
 function getStyleLayerVisibility(layer: MapLibre.LayerSpecification): LayerVisibility {
@@ -252,15 +280,9 @@ function setSatelliteBasemapVisibility(map: MapLibre.Map, basemapMode: BasemapMo
   }
 }
 
-function applyBasemapMode(
-  map: MapLibre.Map,
-  basemapMode: BasemapMode,
-  streetLayerVisibility: LayerVisibilityById,
-  parcelMinZoom: number
-) {
+function applyBasemapMode(map: MapLibre.Map, basemapMode: BasemapMode, streetLayerVisibility: LayerVisibilityById) {
   setStreetBasemapVisibility(map, basemapMode, streetLayerVisibility);
   setSatelliteBasemapVisibility(map, basemapMode);
-  setParcelBoundaryPaint(map, basemapMode, parcelMinZoom);
 }
 
 function getStreetMapStyle(styleUrl: string | undefined): MapStyleConfig {
@@ -285,7 +307,15 @@ function getStreetMapStyle(styleUrl: string | undefined): MapStyleConfig {
       {
         id: "usgs-topo",
         type: "raster",
-        source: "usgs-topo"
+        source: "usgs-topo",
+        // Muted so parcel outlines carry the map. Past the source's native detail (z16) the raster only
+        // magnifies, so it fades toward the neutral map background instead of showing blurry labels.
+        paint: {
+          "raster-saturation": -0.35,
+          "raster-contrast": -0.08,
+          "raster-brightness-max": 0.98,
+          "raster-opacity": ["interpolate", ["linear"], ["zoom"], 15.8, 1, 17.6, 0.42]
+        }
       }
     ]
   };
@@ -401,25 +431,18 @@ function setMeasurementSourceData(
 }
 
 function getSelectedParcelCameraPadding(map: MapLibre.Map): MapLibre.PaddingOptions {
+  // In the side layout the map element already excludes the panel; only floating controls need room.
+  if (currentLayoutMode() !== "sheet") return { top: 96, right: 80, bottom: 80, left: 60 };
   const container = map.getContainer();
-  if (window.innerWidth > 760) return { top: 100, right: 80, bottom: 80, left: 60 };
   const containerHeight = container.clientHeight;
   const containerWidth = container.clientWidth;
   const sidePadding = containerWidth < 720 ? 18 : SELECTED_PARCEL_SIDE_PADDING;
-  const fallbackPanelHeight = Math.min(
-    containerHeight * (containerWidth < 720 ? 0.54 : 0.5),
-    containerWidth < 720 ? 500 : 520
-  );
-  let coveredPanelHeight = fallbackPanelHeight;
-
   const panel = document.querySelector<HTMLElement>(".side-panel:not(.collapsed)");
-  if (panel) {
-    const mapRect = container.getBoundingClientRect();
-    const panelRect = panel.getBoundingClientRect();
-    coveredPanelHeight = Math.max(0, mapRect.bottom - Math.max(mapRect.top, panelRect.top));
-  }
+  // The sheet animates to its next height, so use the height it is heading to rather than where it is now.
+  const targetHeight = panel ? parseFloat(panel.style.getPropertyValue("--sheet-px")) : Number.NaN;
+  const coveredPanelHeight = Number.isFinite(targetHeight) ? targetHeight : Math.min(containerHeight * 0.52, 420);
 
-  const top = containerWidth < 720 ? 72 : SELECTED_PARCEL_TOP_PADDING;
+  const top = containerWidth < 720 ? 76 : SELECTED_PARCEL_TOP_PADDING;
   const maxBottom = Math.max(80, containerHeight - top - 96);
   const bottom = Math.min(
     Math.max(coveredPanelHeight + SELECTED_PARCEL_BOTTOM_MARGIN, SELECTED_PARCEL_MIN_BOTTOM_PADDING),
@@ -681,6 +704,30 @@ type AuthPayload = {
 
 type AuthMode = "sign-in" | "create-account";
 
+/** Full-screen frame for sign-in and status screens. The brand panel only shows on wide screens. */
+function AuthShell({ children, bare = false }: { children: React.ReactNode; bare?: boolean }) {
+  return (
+    <div className="auth-screen">
+      {bare ? null : (
+        <aside className="auth-aside" aria-hidden="true">
+          <Contours />
+          <div className="auth-aside-inner">
+            <span className="brand">
+              <BrandMark />
+              <span className="brand-name">Parcel</span>
+            </span>
+            <div className="auth-aside-copy">
+              <p className="auth-aside-title">Parcel records for Upper Peninsula real estate.</p>
+              <p>Search public parcel data, compare properties, and keep your notes organized by client.</p>
+            </div>
+          </div>
+        </aside>
+      )}
+      <main className="auth-main">{children}</main>
+    </div>
+  );
+}
+
 export default function ParcelMap() {
   const [initialPrefs] = useState(readMapPrefs);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -701,13 +748,18 @@ export default function ParcelMap() {
   const recentFeaturesRef = useRef(new Map<string, ParcelFeature>());
   const userLocationMarkerRef = useRef<MapLibre.Marker | null>(null);
   const hoverTipRef = useRef<HTMLDivElement | null>(null);
+  const navHostRef = useRef<HTMLDivElement | null>(null);
+  const setNavHost = useCallback((element: HTMLDivElement | null) => {
+    navHostRef.current = element;
+  }, []);
+  const layoutMode = useLayoutMode();
   const openPopoverRef = useRef<WorkspacePopover>(null);
   const [selectedParcel, setSelectedParcel] = useState<ParcelFeature | null>(null);
-  const [activePanel, setActivePanel] = useState<AppPanel>("search");
+  // Phones open on the map itself; the Explore sheet is one tap away.
+  const [activePanel, setActivePanel] = useState<AppPanel>(() => (currentLayoutMode() === "sheet" ? "map" : "search"));
   const [basemapMode, setBasemapMode] = useState<BasemapMode>(initialPrefs.basemap);
   const [measurementMode, setMeasurementMode] = useState<MeasurementMode>("distance");
   const [measurementPoints, setMeasurementPoints] = useState<MeasurementPoint[]>([]);
-  const [statusMessage, setStatusMessage] = useState("Zoom in to view parcels.");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -824,9 +876,10 @@ export default function ParcelMap() {
 
   function applyOverlayPreferences(map: MapLibre.Map) {
     const prefs = overlayPreferencesRef.current;
+    const mode = basemapModeRef.current;
     const vectorTilesActive = Boolean(map.getSource(PARCEL_TILE_SOURCE_ID));
     for (const id of [
-      PARCEL_TILE_LINE_LAYER_ID, PARCEL_TILE_FILL_LAYER_ID,
+      PARCEL_TILE_LINE_LAYER_ID, PARCEL_TILE_FILL_LAYER_ID, PARCEL_TILE_CASING_LAYER_ID,
       // The hover outline also draws from the tile source, so it must hide with the rest or tiles keep loading.
       PARCEL_TILE_HOVER_LAYER_ID, OFFLINE_PARCEL_HOVER_LAYER_ID,
       PARCEL_GEOJSON_LINE_LAYER_ID, PARCEL_GEOJSON_FILL_LAYER_ID,
@@ -834,15 +887,15 @@ export default function ParcelMap() {
     ]) {
       if (!map.getLayer(id)) continue;
       const isGeoJsonFallback = id === PARCEL_GEOJSON_LINE_LAYER_ID || id === PARCEL_GEOJSON_FILL_LAYER_ID;
-      // Invisible paint still requests tiles; hide the layers to stop that work.
-      map.setLayoutProperty(id, "visibility", prefs.boundaries && !(isGeoJsonFallback && vectorTilesActive) ? "visible" : "none");
+      // The dark casing only helps over imagery. Invisible paint still requests tiles, so hide layers entirely.
+      const needed = id === PARCEL_TILE_CASING_LAYER_ID ? mode === "satellite" : true;
+      map.setLayoutProperty(
+        id,
+        "visibility",
+        prefs.boundaries && needed && !(isGeoJsonFallback && vectorTilesActive) ? "visible" : "none"
+      );
     }
-    for (const id of [PARCEL_TILE_LINE_LAYER_ID, PARCEL_GEOJSON_LINE_LAYER_ID, OFFLINE_PARCEL_LINE_LAYER_ID]) {
-      if (map.getLayer(id)) map.setPaintProperty(id, "line-opacity", prefs.boundaries ? 0.85 : 0);
-    }
-    for (const id of [PARCEL_TILE_FILL_LAYER_ID, PARCEL_GEOJSON_FILL_LAYER_ID, OFFLINE_PARCEL_FILL_LAYER_ID]) {
-      if (map.getLayer(id)) map.setPaintProperty(id, "fill-opacity", prefs.boundaries ? prefs.fillOpacity / 100 : 0);
-    }
+    paintParcelLayers(map, mode, prefs, getParcelLayerConfig().minZoom);
     for (const id of [SATELLITE_ROAD_LABEL_LAYER_ID, SATELLITE_PLACE_LABEL_LAYER_ID]) {
       if (map.getLayer(id))
         map.setLayoutProperty(
@@ -883,12 +936,11 @@ export default function ParcelMap() {
     if (nextParcel && focus) focusMapOnSelectedParcel(map, nextParcel);
   }
 
-  function clearSelection(message = "Selection cleared.") {
+  function clearSelection() {
     selectionRequestRef.current += 1;
     lookupAbortRef.current?.abort();
     showSelectedParcel(null);
     if (activePanelRef.current === "details") setActivePanel("map");
-    setStatusMessage(message);
   }
 
   function selectParcelFeature(parcel: ParcelFeature) {
@@ -1292,7 +1344,7 @@ export default function ParcelMap() {
     basemapModeRef.current = basemapMode;
     const map = mapRef.current;
     if (!map?.getLayer(SATELLITE_LAYER_ID)) return;
-    applyBasemapMode(map, basemapMode, streetLayerVisibilityRef.current, getParcelLayerConfig().minZoom);
+    applyBasemapMode(map, basemapMode, streetLayerVisibilityRef.current);
     applyOverlayPreferences(map);
   }, [basemapMode]);
 
@@ -1365,16 +1417,23 @@ export default function ParcelMap() {
       refreshExpiredTiles: false,
       maxTileCacheZoomLevels: MAP_TILE_CACHE_ZOOM_LEVELS,
       attributionControl: {
-        compact: window.matchMedia("(max-width: 700px)").matches
+        compact: currentLayoutMode() === "sheet"
       }
     });
 
-    map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "top-right");
+    // Zoom/compass live in our own control column so every control shares one look and layout.
+    // "Locate" in that column also selects the parcel under the device, so the built-in geolocate control is omitted.
+    const navigation = new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true });
+    const navigationHost = navHostRef.current;
+    if (navigationHost) navigationHost.appendChild(navigation.onAdd(map));
+    else map.addControl(navigation, "top-right");
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: "imperial" }), "bottom-left");
-    map.addControl(
-      new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: false }),
-      "top-right"
-    );
+    // On touch screens the compass only appears once the map is rotated or tilted.
+    const syncCompass = () => {
+      navigationHost?.classList.toggle("is-rotated", Math.abs(map.getBearing()) > 0.5 || map.getPitch() > 0.5);
+    };
+    map.on("rotate", syncCompass);
+    map.on("pitch", syncCompass);
     const resizeObserver = new ResizeObserver(() => map.resize());
     resizeObserver.observe(mapContainerRef.current);
     mapRef.current = map;
@@ -1383,9 +1442,8 @@ export default function ParcelMap() {
       vectorTilesEnabled: getParcelLayerConfig().vectorTilesEnabled && authData.vectorTilesAvailable !== false
     };
 
-    function clearParcels(message: string) {
+    function clearParcels() {
       setGeoJsonSourceData(map, "parcels", EMPTY_FEATURE_COLLECTION);
-      setStatusMessage(message);
     }
 
     function setParcelGeoJsonLayerVisibility(visible: boolean) {
@@ -1404,7 +1462,7 @@ export default function ParcelMap() {
       if (zoom < minZoom || !overlayPreferencesRef.current.boundaries) {
         parcelAbortRef.current?.abort();
         setLoading(false);
-        clearParcels(zoom < minZoom ? "Zoom in to view parcels." : "Parcel boundaries hidden.");
+        clearParcels();
         return;
       }
 
@@ -1438,14 +1496,7 @@ export default function ParcelMap() {
           (!parcelLayerConfig.vectorTilesEnabled || Boolean(payload.demo));
         setParcelGeoJsonLayerVisibility(shouldShowGeoJsonParcels);
         setGeoJsonSourceData(mapRef.current, "parcels", shouldShowGeoJsonParcels ? data : EMPTY_FEATURE_COLLECTION);
-        setStatusMessage(
-          payload.message ??
-            (parcelLayerConfig.vectorTilesEnabled
-              ? "Parcel vector tiles active. Click a parcel for full details."
-              : `${data.features.length.toLocaleString()} parcel outline${
-                  data.features.length === 1 ? "" : "s"
-                } loaded.`)
-        );
+        if (payload.tooMany && payload.message) setToast(payload.message);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setError(err instanceof Error ? err.message : "Unable to load visible parcels");
@@ -1466,14 +1517,12 @@ export default function ParcelMap() {
       if (!overlayPreferencesRef.current.boundaries) {
         parcelAbortRef.current?.abort();
         setLoading(false);
-        setStatusMessage("Parcel boundaries hidden.");
         return;
       }
       if (parcelLayerConfig.vectorTilesEnabled) {
         if (!map.getSource(PARCEL_TILE_SOURCE_ID)) return;
         const showParcels = map.getZoom() >= parcelLayerConfig.minZoom;
         setLoading(showParcels && !map.isSourceLoaded(PARCEL_TILE_SOURCE_ID));
-        setStatusMessage(showParcels ? "Click a parcel for full details." : "Zoom in to view parcels.");
         return;
       }
       parcelDebounceRef.current = setTimeout(() => {
@@ -1671,16 +1720,24 @@ export default function ParcelMap() {
           maxzoom: 18
         });
 
+        // Paint values here are placeholders; paintParcelLayers sets the real ones for the active basemap.
         map.addLayer({
           id: PARCEL_TILE_FILL_LAYER_ID,
           type: "fill",
           source: PARCEL_TILE_SOURCE_ID,
           "source-layer": PARCEL_TILE_SOURCE_LAYER,
           minzoom: parcelLayerConfig.minZoom,
-          paint: {
-            "fill-color": "#2563eb",
-            "fill-opacity": ["interpolate", ["linear"], ["zoom"], parcelLayerConfig.minZoom, 0.03, 16, 0.08]
-          }
+          paint: { "fill-color": MAP_THEME.streets.fill, "fill-opacity": 0 }
+        });
+
+        map.addLayer({
+          id: PARCEL_TILE_CASING_LAYER_ID,
+          type: "line",
+          source: PARCEL_TILE_SOURCE_ID,
+          "source-layer": PARCEL_TILE_SOURCE_LAYER,
+          minzoom: parcelLayerConfig.minZoom,
+          layout: { visibility: "none", "line-join": "round" },
+          paint: { "line-color": MAP_THEME.satellite.casing, "line-opacity": 0, "line-width": 2 }
         });
 
         map.addLayer({
@@ -1689,11 +1746,8 @@ export default function ParcelMap() {
           source: PARCEL_TILE_SOURCE_ID,
           "source-layer": PARCEL_TILE_SOURCE_LAYER,
           minzoom: parcelLayerConfig.minZoom,
-          paint: {
-            "line-color": STREET_PARCEL_LINE_COLOR,
-            "line-opacity": getStreetParcelTileLineOpacity(parcelLayerConfig.minZoom),
-            "line-width": ["interpolate", ["linear"], ["zoom"], parcelLayerConfig.minZoom, 0.55, 17, 1.25]
-          }
+          layout: { "line-join": "round" },
+          paint: { "line-color": MAP_THEME.streets.line, "line-opacity": 0.6, "line-width": 1 }
         });
 
         map.addLayer({
@@ -1703,7 +1757,8 @@ export default function ParcelMap() {
           "source-layer": PARCEL_TILE_SOURCE_LAYER,
           minzoom: parcelLayerConfig.minZoom,
           filter: HOVER_FILTER_NONE,
-          paint: { "line-color": STREET_HOVER_LINE_COLOR, "line-width": 2.5 }
+          layout: { "line-join": "round" },
+          paint: { "line-color": MAP_THEME.streets.hover, "line-width": 2.4 }
         });
       }
 
@@ -1720,7 +1775,7 @@ export default function ParcelMap() {
           visibility: parcelLayerConfig.vectorTilesEnabled ? "none" : "visible"
         },
         paint: {
-          "fill-color": "#2563eb",
+          "fill-color": MAP_THEME.streets.fill,
           "fill-opacity": 0.08
         }
       });
@@ -1733,8 +1788,8 @@ export default function ParcelMap() {
           visibility: parcelLayerConfig.vectorTilesEnabled ? "none" : "visible"
         },
         paint: {
-          "line-color": STREET_PARCEL_LINE_COLOR,
-          "line-opacity": 0.65,
+          "line-color": MAP_THEME.streets.line,
+          "line-opacity": 0.75,
           "line-width": 1
         }
       });
@@ -1744,7 +1799,7 @@ export default function ParcelMap() {
         type: "line",
         source: "parcels",
         filter: HOVER_FILTER_NONE,
-        paint: { "line-color": STREET_HOVER_LINE_COLOR, "line-width": 2.5 }
+        paint: { "line-color": MAP_THEME.streets.hover, "line-width": 2.4 }
       });
 
       map.addSource(OFFLINE_PARCEL_SOURCE_ID, {
@@ -1757,7 +1812,7 @@ export default function ParcelMap() {
         type: "fill",
         source: OFFLINE_PARCEL_SOURCE_ID,
         paint: {
-          "fill-color": "#10b981",
+          "fill-color": MAP_THEME.offline.fill,
           "fill-opacity": 0.14
         }
       });
@@ -1767,8 +1822,8 @@ export default function ParcelMap() {
         type: "line",
         source: OFFLINE_PARCEL_SOURCE_ID,
         paint: {
-          "line-color": "#047857",
-          "line-opacity": 0.86,
+          "line-color": MAP_THEME.offline.line,
+          "line-opacity": 0.9,
           "line-width": 1.4
         }
       });
@@ -1778,7 +1833,7 @@ export default function ParcelMap() {
         type: "line",
         source: OFFLINE_PARCEL_SOURCE_ID,
         filter: HOVER_FILTER_NONE,
-        paint: { "line-color": "#064e3b", "line-width": 2.5 }
+        paint: { "line-color": MAP_THEME.offline.line, "line-width": 2.4 }
       });
 
       map.addLayer({
@@ -1786,8 +1841,21 @@ export default function ParcelMap() {
         type: "fill",
         source: "selected-parcel",
         paint: {
-          "fill-color": "#f97316",
+          "fill-color": MAP_THEME.streets.selectedFill,
           "fill-opacity": 0.22
+        }
+      });
+
+      // A halo under the selection line keeps it distinct from neighboring outlines on any basemap.
+      map.addLayer({
+        id: SELECTED_PARCEL_CASING_LAYER_ID,
+        type: "line",
+        source: "selected-parcel",
+        layout: { "line-join": "round" },
+        paint: {
+          "line-color": MAP_THEME.streets.casing,
+          "line-opacity": 0.95,
+          "line-width": 6.5
         }
       });
 
@@ -1795,8 +1863,9 @@ export default function ParcelMap() {
         id: SELECTED_PARCEL_LINE_LAYER_ID,
         type: "line",
         source: "selected-parcel",
+        layout: { "line-join": "round" },
         paint: {
-          "line-color": STREET_SELECTED_PARCEL_LINE_COLOR,
+          "line-color": MAP_THEME.streets.selected,
           "line-width": 3
         }
       });
@@ -1808,10 +1877,10 @@ export default function ParcelMap() {
         type: "circle",
         source: SAVED_PARCEL_SOURCE_ID,
         paint: {
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 4.5, 14, 6.5, 18, 8],
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 5, 14, 7, 18, 9],
           "circle-color": ["get", "color"],
           "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 2
+          "circle-stroke-width": 2.5
         }
       });
 
@@ -1826,7 +1895,7 @@ export default function ParcelMap() {
         source: MEASUREMENT_SOURCE_ID,
         filter: ["==", ["geometry-type"], "Polygon"],
         paint: {
-          "fill-color": "#14b8a6",
+          "fill-color": MAP_THEME.measure.fill,
           "fill-opacity": 0.22
         }
       });
@@ -1837,7 +1906,7 @@ export default function ParcelMap() {
         source: MEASUREMENT_SOURCE_ID,
         filter: ["!=", ["geometry-type"], "Point"],
         paint: {
-          "line-color": "#0f766e",
+          "line-color": MAP_THEME.measure.line,
           "line-width": 3,
           "line-dasharray": [1.5, 1]
         }
@@ -1851,12 +1920,12 @@ export default function ParcelMap() {
         paint: {
           "circle-radius": 6,
           "circle-color": "#ffffff",
-          "circle-stroke-color": "#0f766e",
+          "circle-stroke-color": MAP_THEME.measure.line,
           "circle-stroke-width": 3
         }
       });
 
-      applyBasemapMode(map, basemapModeRef.current, streetLayerVisibilityRef.current, parcelLayerConfig.minZoom);
+      applyBasemapMode(map, basemapModeRef.current, streetLayerVisibilityRef.current);
       applyOverlayPreferences(map);
       queueVisibleParcelLoad(0);
       setBelowParcelZoom(map.getZoom() < parcelLayerConfig.minZoom);
@@ -1911,21 +1980,19 @@ export default function ParcelMap() {
       }
 
       if (map.getZoom() < parcelLayerConfig.minZoom) {
-        setStatusMessage("Zoom in until parcel outlines are visible before selecting a parcel.");
+        setToast("Zoom in until parcel outlines are visible before selecting a parcel.");
         return;
       }
 
       const clickedParcel = getSelectableParcelAtPoint(map, event.point);
       if (!clickedParcel.hasFeature) {
         if (selectedId) clearSelection();
-        else setStatusMessage("Click a visible parcel outline to select it.");
         return;
       }
 
       // Clicking the selected parcel brings its details back instead of unselecting it.
       if (clickedParcel.parcelId && clickedParcel.parcelId === selectedId) {
         setActivePanel("details");
-        setStatusMessage("Press Esc or click an empty spot to clear the selection.");
         return;
       }
 
@@ -1933,13 +2000,13 @@ export default function ParcelMap() {
         const cachedParcel = findCachedParcel(offlineFeatureCollectionRef.current, clickedParcel.parcelId);
         if (cachedParcel) {
           selectParcelFeature(cachedParcel);
-          setStatusMessage("Selected parcel from a downloaded browser area.");
+          setToast("Selected parcel from a downloaded browser area.");
           return;
         }
       }
 
       const result = await selectParcelAtPoint(event.lngLat.lng, event.lngLat.lat);
-      if (result && !result.parcel) setStatusMessage("No parcel record was found at that spot.");
+      if (result && !result.parcel) setToast("No parcel record was found at that spot.");
     });
 
     return () => {
@@ -1950,6 +2017,7 @@ export default function ParcelMap() {
       lookupAbortRef.current?.abort();
       cancelAnimationFrame(hoverFrame);
       userLocationMarkerRef.current?.remove();
+      if (navigationHost) navigation.onRemove();
       map.remove();
       mapRef.current = null;
       setMapReady(false);
@@ -2096,26 +2164,30 @@ export default function ParcelMap() {
 
   if (authLoading) {
     return (
-      <div className="map-layout">
-        <section className="auth-panel">
-          <h2>Checking access…</h2>
-          <p>Loading your private parcel workspace.</p>
+      <AuthShell bare>
+        <section className="auth-status" role="status" aria-live="polite">
+          <BrandMark size={44} />
+          <span className="spinner" aria-hidden="true" />
+          <div>
+            <h1>Checking access…</h1>
+            <p>Loading your private parcel workspace.</p>
+          </div>
         </section>
-      </div>
+      </AuthShell>
     );
   }
 
   if (authError && !authData) {
     return (
-      <div className="map-layout">
-        <section className="auth-panel">
-          <h2>Unable to check access</h2>
+      <AuthShell bare>
+        <section className="auth-card">
+          <h1>Unable to check access</h1>
           <p>{authError}</p>
           <button className="primary-button" type="button" onClick={() => window.location.reload()}>
             Retry
           </button>
         </section>
-      </div>
+      </AuthShell>
     );
   }
 
@@ -2124,11 +2196,15 @@ export default function ParcelMap() {
     const signupDisabled = !signupEmail.trim() || signupPassword.length < 8 || signupPassword !== signupPasswordConfirm;
 
     return (
-      <div className="map-layout">
-        <section className="auth-panel">
+      <AuthShell>
+        <section className="auth-card">
+          <span className="brand">
+            <BrandMark />
+            <span className="brand-name">Parcel</span>
+          </span>
           {authMode === "sign-in" ? (
             <>
-              <h2>Private parcel workspace</h2>
+              <h1>Private parcel workspace</h1>
               <p>Sign in to explore Upper Peninsula parcel records and your saved projects.</p>
               <form className="form-stack" onSubmit={login}>
                 <label>
@@ -2137,6 +2213,9 @@ export default function ParcelMap() {
                     value={authUsername}
                     onChange={(event) => setAuthUsername(event.target.value)}
                     autoComplete="username"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                   />
                 </label>
                 <label>
@@ -2151,7 +2230,11 @@ export default function ParcelMap() {
                 <button className="primary-button" disabled={!authPassword}>
                   Sign in
                 </button>
-                {authError ? <p className="message error">{authError}</p> : null}
+                {authError ? (
+                  <p role="alert" className="message error">
+                    {authError}
+                  </p>
+                ) : null}
               </form>
               {canCreateAccount ? (
                 <div className="auth-action-row">
@@ -2171,7 +2254,7 @@ export default function ParcelMap() {
             </>
           ) : (
             <>
-              <h2>Create an account</h2>
+              <h1>Create an account</h1>
               <p>Use your email and a password to set up your own login.</p>
               <form className="form-stack" onSubmit={createAccount}>
                 <label>
@@ -2188,6 +2271,8 @@ export default function ParcelMap() {
                     value={signupEmail}
                     onChange={(event) => setSignupEmail(event.target.value)}
                     autoComplete="email"
+                    autoCapitalize="none"
+                    inputMode="email"
                     type="email"
                   />
                 </label>
@@ -2199,6 +2284,7 @@ export default function ParcelMap() {
                     type="password"
                     autoComplete="new-password"
                   />
+                  <small className="field-hint">At least 8 characters.</small>
                 </label>
                 <label>
                   Confirm password
@@ -2212,7 +2298,11 @@ export default function ParcelMap() {
                 <button className="primary-button" disabled={signupDisabled}>
                   Create account
                 </button>
-                {authError ? <p className="message error">{authError}</p> : null}
+                {authError ? (
+                  <p role="alert" className="message error">
+                    {authError}
+                  </p>
+                ) : null}
               </form>
               <div className="auth-action-row">
                 <span>Already have an account?</span>
@@ -2229,23 +2319,30 @@ export default function ParcelMap() {
               </div>
             </>
           )}
+          <p className="auth-note">
+            Parcel boundaries and property data are approximate and are not a legal survey, title opinion, or zoning
+            determination.
+          </p>
         </section>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className={`map-layout workspace-layout ${activePanel === "map" ? "panel-collapsed" : "panel-open"}`}>
-      <div className="map-wrap">
+    <div
+      className={`map-layout ${activePanel === "map" ? "panel-collapsed" : "panel-open"}`}
+      data-layout={layoutMode}
+    >
+      <main className="map-wrap" aria-label="Parcel map">
         <div ref={mapContainerRef} className="map-canvas" />
         <div ref={hoverTipRef} className="map-hover-tip" hidden aria-hidden="true" />
         {belowParcelZoom && boundaries && activePanel !== "measure" && !(activePanel === "search" && pinnedResults.length) ? (
           <button type="button" className="zoom-hint" onClick={zoomToParcels}>
-            <Icon name="zoomIn" size={17} />
+            <Icon name="zoomIn" size={18} />
             Zoom in to see parcel boundaries
           </button>
         ) : null}
-      </div>
+      </main>
       <WorkspaceChrome
         panel={activePanel}
         onPanel={setActivePanel}
@@ -2280,10 +2377,10 @@ export default function ParcelMap() {
         onSignOut={authData?.authEnabled ? signOut : undefined}
         userName={authData?.user?.displayName || "Realtor"}
         coordinate={coordinate}
-        status={activePanel === "measure" ? "Measurement mode · click the map to add points" : statusMessage}
         error={error}
         loading={loading}
         toast={toast}
+        onNavHost={setNavHost}
       />
       <ParcelDetails
         activePanel={activePanel}

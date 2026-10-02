@@ -1,0 +1,194 @@
+/* Property brief: on-screen preview dialog and print output. */
+.print-brief {
+  display: none;
+}
+
+.print-dialog {
+  z-index: var(--z-dialog);
+  width: min(820px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: auto;
+  background: var(--surface);
+  color: var(--text);
+  border: 0;
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg);
+}
+
+.print-dialog::backdrop {
+  background: rgb(19 26 23 / 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.print-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 12px 12px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.print-toolbar > strong {
+  font-size: var(--fs-base);
+}
+
+.print-dialog .print-brief {
+  display: block;
+  padding: 32px 32px 40px;
+}
+
+.print-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-size: var(--fs-xs);
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--g-700);
+}
+
+.print-mark {
+  width: 22px;
+  height: 22px;
+}
+
+.print-brief h1 {
+  font-size: 28px;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+
+.print-brief > p {
+  margin-top: 4px;
+  font-size: var(--fs-sm);
+}
+
+.print-brief .parcel-outline {
+  float: right;
+  width: 168px;
+  height: 148px;
+  margin: 0 0 18px 24px;
+}
+
+.print-brief .parcel-measurements {
+  margin-top: 20px;
+}
+
+.print-brief .record-list {
+  clear: both;
+  margin-top: 20px;
+}
+
+.print-brief .record-list > div {
+  grid-template-columns: 190px minmax(0, 1fr);
+}
+
+.print-brief .print-disclaimer {
+  margin-top: 28px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-strong);
+  font-size: var(--fs-xs);
+  line-height: 1.55;
+  color: var(--n-600);
+}
+
+@media print {
+  @page {
+    margin: 16mm;
+  }
+
+  html,
+  body,
+  .app-shell,
+  .map-layout {
+    display: block;
+    height: auto;
+    overflow: visible;
+    background: #fff;
+  }
+
+  body:has(.print-dialog) .app-shell {
+    display: none;
+  }
+
+  .print-dialog {
+    position: static;
+    width: auto;
+    max-height: none;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .print-dialog::backdrop,
+  .print-toolbar {
+    display: none;
+  }
+
+  .print-dialog .print-brief {
+    padding: 0;
+  }
+
+  .app-header,
+  .app-nav,
+  .app-footer,
+  .map-wrap,
+  .map-ui,
+  .map-banner,
+  .map-progress,
+  .coordinate-readout,
+  .layers-popover,
+  .help-popover,
+  .workspace-toast,
+  .panel-head {
+    display: none !important;
+  }
+
+  .side-panel,
+  .panel-body {
+    position: static;
+    display: block;
+    width: auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .panel-body > :not(.print-brief) {
+    display: none !important;
+  }
+
+  .print-brief {
+    display: block;
+    color: #111;
+  }
+
+  .print-brief .parcel-outline {
+    width: 170px;
+    height: 150px;
+  }
+
+  .print-brief .record-list > div,
+  .print-brief .stat-grid > div {
+    break-inside: avoid;
+  }
+
+  .print-brief p,
+  .print-brief dd,
+  .print-brief dt {
+    color: #333;
+  }
+}

@@ -1,0 +1,151 @@
+/*
+ * Design tokens. Everything visual in the app reads from these custom properties.
+ * Neutrals carry a slight green undertone so they sit comfortably next to the brand color.
+ */
+:root {
+  color-scheme: light;
+
+  /* Neutrals */
+  --n-0: #ffffff;
+  --n-25: #fafbfa;
+  --n-50: #f4f6f5;
+  --n-100: #eaeeec;
+  --n-150: #e0e6e3;
+  --n-200: #d3dad7;
+  --n-300: #b9c3bf;
+  --n-400: #93a09b;
+  --n-500: #5f6e68;
+  --n-600: #4a5953;
+  --n-700: #35413c;
+  --n-800: #212b27;
+  --n-900: #131a17;
+
+  /* Brand: deep lake green */
+  --g-50: #eef7f2;
+  --g-100: #d9eee3;
+  --g-200: #b4dcc8;
+  --g-300: #84c3a5;
+  --g-400: #4fa682;
+  --g-500: #2b8a67;
+  --g-600: #17694f;
+  --g-700: #125540;
+  --g-800: #0f4434;
+  --g-900: #0b3027;
+
+  /* Selection accent (matches the highlighted parcel on the map) */
+  --o-50: #fff5ed;
+  --o-100: #ffe7d3;
+  --o-300: #fdba84;
+  --o-500: #f97316;
+  --o-600: #ea580c;
+  --o-700: #c2410c;
+
+  /* Semantic */
+  --danger-50: #fef3f2;
+  --danger-100: #fee4e2;
+  --danger-600: #b42318;
+  --danger-700: #912018;
+  --warn-50: #fffaeb;
+  --warn-200: #fedf89;
+  --warn-700: #8a4b0a;
+  --info-50: #eff6ff;
+  --info-200: #bfdbfe;
+  --info-700: #1d4ed8;
+
+  /* Roles */
+  --text: var(--n-900);
+  --text-2: var(--n-600);
+  --text-3: var(--n-500);
+  --surface: var(--n-0);
+  --surface-2: var(--n-25);
+  --surface-3: var(--n-50);
+  --line: var(--n-150);
+  --line-strong: var(--n-200);
+  --brand: var(--g-600);
+  --brand-hover: var(--g-700);
+  --brand-soft: var(--g-50);
+  --focus: var(--g-500);
+
+  /* Type */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-base: 14px;
+  --fs-md: 15px;
+  --fs-lg: 17px;
+  --fs-xl: 20px;
+  --fs-2xl: 24px;
+  --fs-3xl: 30px;
+
+  /* Shape */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-2xl: 20px;
+  --r-full: 999px;
+
+  /* Elevation */
+  --shadow-xs: 0 1px 2px rgb(19 26 23 / 0.06);
+  --shadow-sm: 0 1px 2px rgb(19 26 23 / 0.06), 0 2px 8px rgb(19 26 23 / 0.07);
+  --shadow-md: 0 2px 4px rgb(19 26 23 / 0.05), 0 10px 28px rgb(19 26 23 / 0.14);
+  --shadow-lg: 0 8px 16px rgb(19 26 23 / 0.08), 0 28px 64px rgb(19 26 23 / 0.22);
+  --shadow-sheet: 0 -1px 0 rgb(19 26 23 / 0.06), 0 -10px 32px rgb(19 26 23 / 0.16);
+  --ring: 0 0 0 3px rgb(43 138 103 / 0.22);
+
+  /* Motion */
+  --ease: cubic-bezier(0.22, 0.9, 0.3, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+
+  /* Layout */
+  --header-h: 56px;
+  --rail-w: 76px;
+  --panel-w: 400px;
+  --nav-h: 60px;
+  --hit: 40px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  /* Stacking */
+  --z-map-ui: 3;
+  --z-panel: 6;
+  --z-sheet: 8;
+  --z-header: 12;
+  --z-popover: 20;
+  --z-toast: 40;
+  --z-dialog: 100;
+}
+
+@media (pointer: coarse) {
+  :root {
+    --hit: 44px;
+  }
+}
+
+@media (min-width: 1600px) {
+  :root {
+    --panel-w: 432px;
+  }
+}
+
+@media (max-width: 1180px) and (min-width: 960px) {
+  :root {
+    --panel-w: 360px;
+    --rail-w: 68px;
+  }
+}
+
+/* Landscape phones: reclaim vertical space. */
+@media (max-height: 520px) and (orientation: landscape) and (min-width: 560px) {
+  :root {
+    --header-h: 48px;
+    --rail-w: 60px;
+    --panel-w: 340px;
+  }
+}

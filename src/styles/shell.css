@@ -1,0 +1,847 @@
+/*
+ * Application shell.
+ *
+ * Desktop:   header across the top; navigation rail | side panel | map; disclaimer footer.
+ * Phones and portrait tablets (< 960px): header; map; disclaimer; bottom navigation.
+ *            The panel becomes a bottom sheet laid over the map (peek / half / full).
+ *
+ * Every map overlay is placed with `grid-area: map`, so offsets are relative to the map
+ * itself and never depend on magic header or footer heights.
+ */
+.app-shell {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.map-layout {
+  --panel-col: var(--panel-w);
+  --sheet-covered: 0px;
+  position: relative;
+  display: grid;
+  height: 100%;
+  overflow: hidden;
+  background: var(--n-100);
+  grid-template-columns: var(--rail-w) var(--panel-col) minmax(0, 1fr);
+  grid-template-rows: calc(var(--header-h) + var(--safe-top)) minmax(0, 1fr) auto;
+  grid-template-areas:
+    "header header header"
+    "nav panel map"
+    "nav footer footer";
+}
+
+.map-layout.panel-collapsed {
+  --panel-col: 0px;
+}
+
+/* ---------- Header ---------- */
+.app-header {
+  grid-area: header;
+  z-index: var(--z-header);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: var(--safe-top) calc(16px + var(--safe-right)) 0 calc(16px + var(--safe-left));
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: -4px;
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--r-md);
+  color: var(--n-900);
+  transition: background-color var(--dur-1) ease;
+}
+
+.brand:hover {
+  background: var(--n-50);
+}
+
+.brand-mark {
+  display: block;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.brand-name {
+  font-size: 18px;
+  font-weight: 680;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.workspace-region {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--n-500);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Typeahead search */
+.header-typeahead {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 380px;
+  max-width: 480px;
+  min-width: 220px;
+  height: 40px;
+  padding: 0 8px 0 12px;
+  background: var(--n-50);
+  border: 1px solid transparent;
+  border-radius: var(--r-lg);
+  color: var(--n-500);
+  transition:
+    background-color var(--dur-1) ease,
+    border-color var(--dur-1) ease,
+    box-shadow var(--dur-1) ease;
+}
+
+.header-typeahead:hover {
+  background: var(--n-100);
+}
+
+.header-typeahead:focus-within {
+  background: var(--surface);
+  border-color: var(--g-500);
+  box-shadow: var(--ring);
+  color: var(--g-700);
+}
+
+.header-typeahead input {
+  flex: 1;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--fs-base);
+}
+
+.header-typeahead input:hover,
+.header-typeahead input:focus {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.header-typeahead .icon-button {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-sm);
+}
+
+.typeahead-panel {
+  position: absolute;
+  z-index: var(--z-popover);
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.typeahead-panel ul {
+  padding: 6px;
+}
+
+.typeahead-panel li {
+  display: grid;
+  gap: 2px;
+  padding: 9px 10px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+
+.typeahead-panel li[aria-selected="true"] {
+  background: var(--g-50);
+}
+
+.typeahead-panel li strong {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.typeahead-panel li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--n-600);
+}
+
+.typeahead-panel li em {
+  justify-self: start;
+  font-style: normal;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--info-700);
+}
+
+.typeahead-status {
+  padding: 14px 16px;
+  font-size: var(--fs-sm);
+}
+
+.typeahead-all {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--n-25);
+  color: var(--g-700);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.typeahead-all:hover {
+  background: var(--g-50);
+}
+
+/* Phone search pill (replaces the typeahead on narrow screens) */
+.header-search-pill {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 14px;
+  background: var(--n-50);
+  border-radius: var(--r-full);
+  color: var(--n-500);
+  font-size: var(--fs-base);
+  text-align: left;
+}
+
+.header-search-pill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-account {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--r-full);
+  background: var(--warn-50);
+  color: var(--warn-700);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--warn-200);
+}
+
+.status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--g-500);
+  flex-shrink: 0;
+}
+
+.connection-status .status-dot {
+  background: #d97706;
+}
+
+.avatar-button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--g-100);
+  color: var(--g-800);
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  box-shadow: inset 0 0 0 1px var(--g-200);
+  transition: box-shadow var(--dur-1) ease;
+}
+
+.avatar-button:hover,
+.avatar-button[aria-expanded="true"] {
+  box-shadow: inset 0 0 0 1px var(--g-300), 0 0 0 3px var(--g-50);
+}
+
+.account-menu {
+  position: absolute;
+  z-index: var(--z-popover);
+  top: calc(100% + 10px);
+  right: 0;
+  width: 248px;
+  padding: 8px;
+}
+
+.account-menu-who {
+  display: grid;
+  gap: 2px;
+  padding: 10px 10px 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 6px;
+}
+
+.account-menu-who strong {
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.account-menu-who span {
+  font-size: var(--fs-xs);
+  color: var(--n-500);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--hit);
+  padding: 0 10px;
+  border-radius: var(--r-md);
+  color: var(--n-800);
+  font-size: var(--fs-sm);
+  font-weight: 550;
+}
+
+.menu-item:hover {
+  background: var(--n-50);
+}
+
+/* ---------- Navigation: rail on desktop ---------- */
+.app-nav {
+  grid-area: nav;
+  z-index: var(--z-panel);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 8px calc(12px + var(--safe-bottom));
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+}
+
+.nav-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 58px;
+  padding: 6px 2px;
+  border-radius: var(--r-lg);
+  color: var(--n-600);
+  font-size: var(--fs-xs);
+  font-weight: 550;
+  line-height: 1;
+  transition:
+    background-color var(--dur-1) ease,
+    color var(--dur-1) ease;
+}
+
+.nav-item:hover {
+  background: var(--n-50);
+  color: var(--n-900);
+}
+
+.nav-item.active {
+  background: var(--g-50);
+  color: var(--g-700);
+  font-weight: 650;
+}
+
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--g-600);
+}
+
+.nav-badge {
+  position: absolute;
+  top: 5px;
+  left: calc(50% + 6px);
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-full);
+  background: var(--g-600);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.nav-spacer {
+  flex: 1;
+}
+
+/* ---------- Side panel (desktop) ---------- */
+.side-panel {
+  grid-area: panel;
+  z-index: var(--z-panel);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+}
+
+.side-panel.collapsed {
+  display: none;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 56px;
+  padding: 0 10px 0 20px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.panel-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-lg);
+  letter-spacing: -0.018em;
+}
+
+.sheet-grabber,
+.sheet-toggle {
+  display: none;
+}
+
+.panel-body {
+  container: panel / inline-size;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--n-200) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.panel-section {
+  padding: 20px;
+}
+
+.panel-section + .panel-section {
+  border-top: 1px solid var(--line);
+}
+
+/* ---------- Footer disclaimer ---------- */
+.app-footer {
+  grid-area: footer;
+  z-index: var(--z-panel);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px calc(16px + var(--safe-right)) 9px 16px;
+  background: var(--n-25);
+  border-top: 1px solid var(--line);
+  color: var(--n-600);
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+}
+
+.app-footer > svg {
+  margin-top: 1px;
+  color: var(--n-500);
+}
+
+.disclaimer-short {
+  display: none;
+}
+
+/* ---------- Auth and loading screens ---------- */
+.auth-screen {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 100dvh;
+  height: 100dvh;
+  overflow: auto;
+  background: var(--n-50);
+}
+
+.auth-aside {
+  display: none;
+  position: relative;
+  overflow: hidden;
+  padding: 40px 48px;
+  background: var(--g-800);
+  color: #fff;
+}
+
+.auth-aside .contours {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.auth-aside-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 460px;
+}
+
+.auth-aside .brand {
+  color: #fff;
+}
+
+.auth-aside .brand:hover {
+  background: transparent;
+}
+
+.auth-aside-copy {
+  margin-top: auto;
+  margin-bottom: 8px;
+}
+
+.auth-aside-copy .auth-aside-title {
+  margin: 0;
+  color: #fff;
+  font-size: 34px;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  font-weight: 650;
+  text-wrap: balance;
+}
+
+.auth-aside-copy p:not(.auth-aside-title) {
+  margin-top: 14px;
+  color: rgb(255 255 255 / 0.78);
+  font-size: var(--fs-md);
+  line-height: 1.55;
+  max-width: 40ch;
+}
+
+.auth-main {
+  display: grid;
+  place-items: center;
+  padding: 24px 16px calc(24px + var(--safe-bottom));
+}
+
+.auth-card {
+  width: min(420px, 100%);
+  padding: 32px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.auth-card .brand {
+  margin: -4px 0 20px -4px;
+}
+
+.auth-card h1,
+.auth-status h1 {
+  font-size: var(--fs-2xl);
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.auth-status h1 {
+  font-size: var(--fs-xl);
+}
+
+.auth-card > p {
+  margin-top: 6px;
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+}
+
+.auth-card .form-stack {
+  margin-top: 24px;
+}
+
+.auth-card .primary-button {
+  width: 100%;
+}
+
+.auth-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 20px;
+  color: var(--n-600);
+  font-size: var(--fs-sm);
+}
+
+.auth-note {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--n-500);
+}
+
+.auth-status {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.auth-status .spinner {
+  width: 24px;
+  height: 24px;
+}
+
+@media (min-width: 900px) {
+  .auth-screen {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  }
+
+  .auth-aside {
+    display: block;
+  }
+
+  .auth-card .brand {
+    display: none;
+  }
+}
+
+/*
+ * ---------- Sheet layout (phones and portrait tablets) ----------
+ * `data-layout` is set from one hook (src/lib/layout-mode.ts), so CSS and JavaScript never disagree.
+ */
+.map-layout[data-layout="sheet"] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: calc(var(--header-h) + var(--safe-top)) minmax(0, 1fr) auto calc(var(--nav-h) + var(--safe-bottom));
+  grid-template-areas:
+    "header"
+    "map"
+    "footer"
+    "nav";
+}
+
+[data-layout="sheet"] .app-header {
+  gap: 12px;
+  padding-left: calc(12px + var(--safe-left));
+  padding-right: calc(12px + var(--safe-right));
+}
+
+[data-layout="sheet"] .workspace-region {
+  display: none;
+}
+
+[data-layout="sheet"] .app-footer {
+  padding: 8px calc(14px + var(--safe-right)) 8px calc(14px + var(--safe-left));
+}
+
+[data-layout="sheet"] .disclaimer-full {
+  display: none;
+}
+
+[data-layout="sheet"] .disclaimer-short {
+  display: inline;
+}
+
+/* Bottom navigation */
+[data-layout="sheet"] .app-nav {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+  padding: 0 max(4px, var(--safe-left)) var(--safe-bottom) max(4px, var(--safe-right));
+  border-right: 0;
+  border-top: 1px solid var(--line);
+}
+
+[data-layout="sheet"] .nav-item {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  gap: 4px;
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-layout="sheet"] .nav-item.active::before {
+  left: 24%;
+  right: 24%;
+  top: 0;
+  bottom: auto;
+  width: auto;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+}
+
+[data-layout="sheet"] .nav-badge {
+  top: 6px;
+  left: calc(50% + 4px);
+}
+
+[data-layout="sheet"] .nav-spacer,
+[data-layout="sheet"] .nav-item.nav-guide {
+  display: none;
+}
+
+/* Bottom sheet */
+[data-layout="sheet"] .side-panel {
+  position: absolute;
+  grid-area: map;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-sheet);
+  height: var(--sheet-px, 0px);
+  max-height: 100%;
+  border: 0;
+  border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+  box-shadow: var(--shadow-sheet);
+  transition: height var(--dur-3) var(--ease);
+}
+
+[data-layout="sheet"] .side-panel.dragging {
+  transition: none;
+}
+
+[data-layout="sheet"] .panel-head {
+  position: relative;
+  height: 60px;
+  padding: 16px 8px 0 18px;
+  border-bottom: 0;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+[data-layout="sheet"] .side-panel.dragging .panel-head {
+  cursor: grabbing;
+}
+
+[data-layout="sheet"] .sheet-grabber {
+  display: block;
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 40px;
+  height: 5px;
+  margin-left: -20px;
+  border-radius: var(--r-full);
+  background: var(--n-300);
+}
+
+[data-layout="sheet"] .sheet-toggle {
+  display: inline-grid;
+}
+
+[data-layout="sheet"] .side-panel[data-state="peek"] .panel-body {
+  overflow: hidden;
+  /* Content below the peek fades out instead of being cut off mid-line. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
+}
+
+[data-layout="sheet"] .panel-section {
+  padding: 4px 18px 22px;
+}
+
+/* On tablets keep sheet content readable instead of stretching edge to edge. */
+[data-layout="sheet"] .panel-body > * {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* On very narrow phones the footer icon costs a full line of disclaimer text. */
+@media (max-width: 400px) {
+  [data-layout="sheet"] .app-footer > svg {
+    display: none;
+  }
+}
+
+/* Header search: pill on phones, typeahead on tablets and up */
+@media (max-width: 599px) {
+  .header-typeahead {
+    display: none;
+  }
+
+  .header-search-pill {
+    display: flex;
+  }
+
+  .app-header .brand-name {
+    display: none;
+  }
+
+  .app-header .brand {
+    padding-right: 4px;
+  }
+
+  .header-account {
+    margin-left: 0;
+  }
+}
+
+/* ---------- Landscape phones: keep the side panel, drop the labels ---------- */
+@media (max-height: 520px) and (orientation: landscape) and (min-width: 560px) {
+  .nav-item {
+    min-height: 44px;
+  }
+
+  .nav-item > span:not(.nav-badge) {
+    display: none;
+  }
+
+  .app-nav {
+    gap: 2px;
+    padding-top: 6px;
+  }
+
+  .panel-head {
+    height: 46px;
+  }
+
+  .app-footer {
+    padding: 5px 12px;
+  }
+}
