@@ -16,7 +16,9 @@ This starter is designed for GitHub + Vercel + Neon and gives a coding agent eno
 
 ## Parcel workspace
 
-- Responsive map workspace with desktop navigation and an expandable mobile panel.
+- Responsive map workspace: a navigation rail and side panel on desktop, and on phones
+  a full-screen map with a draggable bottom sheet (peek / half / full) and bottom navigation.
+- Installable to the home screen, with branded sign-in, error and link-preview screens.
 - Topographic and satellite basemaps, parcel/label/saved-parcel layers, fill opacity,
   compass, scale, fullscreen, and copyable links that reopen the selected parcel.
 - Hover outlines with address labels; clicking the selected parcel reopens its details,
@@ -40,6 +42,18 @@ This starter is designed for GitHub + Vercel + Neon and gives a coding agent eno
   market value.
 
 See [Workspace features and verification](docs/UI_WORKSPACE.md) for limits and checks.
+
+### UI code layout
+
+```txt
+src/styles/    tokens → base → components → shell → map → panels → print (imported by src/app/globals.css)
+src/components/  ParcelMap (map + state), WorkspaceChrome (header, nav, map controls), ParcelDetails (panel + bottom sheet)
+src/lib/layout-mode.ts  the one decision between the side layout and the sheet layout
+src/lib/map-theme.ts    parcel colors for the map and its legend
+```
+
+Use the design tokens in `src/styles/tokens.css` rather than literal colors or sizes.
+See "Design system" in [docs/UI_WORKSPACE.md](docs/UI_WORKSPACE.md).
 
 ## Stack
 

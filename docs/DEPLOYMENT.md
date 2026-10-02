@@ -37,10 +37,21 @@
 | `APP_AUTH_USER_NAME` | Optional | Vercel + private local `.env.local` | Server-side owner display name. |
 | `APP_AUTH_SESSION_TTL_SECONDS` | Optional | Vercel + private local `.env.local` | Session duration. Defaults to 7 days. |
 | `NEXT_PUBLIC_APP_NAME` | Optional | Vercel + local `.env.local` | Public app display name for future UI use. |
+| `NEXT_PUBLIC_SITE_URL` | Optional | Vercel + local `.env.local` | Public site URL used for absolute link-preview image URLs. Defaults to the Vercel deployment's own URL, so it is usually not needed. Leave empty to use the default. |
 
 4. Redeploy after environment variable changes.
 
 Only variables prefixed with `NEXT_PUBLIC_` are sent to the browser. Database and auth variables must remain server-side only.
+
+### Build notes
+
+- The build downloads the Geist and Geist Mono fonts from Google Fonts once, through
+  `next/font`, and serves them from the app's own domain. Browsers make no request to a
+  font CDN at runtime. If a build environment has no outbound network access, the build
+  fails at that step.
+- The app is installable: the manifest, icons and link-preview image are generated files
+  under `src/app/` and `public/icons/`. The pages are `noindex` and `robots.txt` disallows
+  crawling because the parcel data is for private use.
 
 ## Neon
 

@@ -1,3 +1,17 @@
+# Visual redesign
+
+- [x] Design tokens and a split stylesheet (`src/styles/`), Geist typography, Lucide icons, new brand mark.
+- [x] Grid-based shell: navigation rail, side panel, map, footer disclaimer; no hard-coded overlay offsets.
+- [x] Phone layout: full-screen map, draggable bottom sheet (peek/half/full), bottom navigation, search pill.
+- [x] Landscape-phone and tablet layouts; no horizontal overflow from 360px to 1920px.
+- [x] Map styling: calmer topo basemap, outlines that sharpen with zoom, white-on-dark satellite outlines, orange selection with halo.
+- [x] Consolidated map controls (one column, no duplicate locate), progress bar, banner and toast feedback.
+- [x] Redesigned Explore, Property (actions above the fold), Projects, Compare, Measure, Offline, print brief.
+- [x] Branded sign-in, loading, error and 404 screens; account menu.
+- [x] Installable (manifest, icons), link-preview image, `noindex`, iOS phone-link protection.
+- [x] Accessibility: axe-core clean (WCAG 2.1 AA), landmarks, focus rings, 4.5:1 text contrast.
+- [ ] Deploy the redesign and verify it on production, including on physical phones (sheet dragging, Add to Home Screen).
+
 # Usability pass
 
 - [x] Project management: rename/delete projects, change tags, remove saved parcels, edit/delete notes (owner-scoped routes).
